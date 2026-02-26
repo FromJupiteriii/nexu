@@ -136,6 +136,9 @@ export async function generatePoolConfig(
         signingSecret,
         mode: "http",
         webhookPath: `/slack/events/${ch.accountId}`,
+        // OpenClaw Slack plugin's isConfigured requires appToken even in HTTP mode.
+        // Provide a placeholder so the account passes the configured check.
+        appToken: "xapp-placeholder-not-used-in-http-mode",
       };
 
       bindingsList.push({
@@ -152,7 +155,7 @@ export async function generatePoolConfig(
     gateway: {
       port: 18789,
       mode: "local",
-      bind: "lan",
+      bind: "loopback",
       auth: {
         mode: "token",
         token: gatewayToken ?? process.env.GATEWAY_TOKEN ?? "gw-secret-token",
@@ -160,6 +163,12 @@ export async function generatePoolConfig(
       reload: { mode: "hybrid" },
     },
     agents: {
+      defaults: {
+        model: {
+          // Use the first bot's model or a sensible default
+          primary: activeBots[0]?.modelId ?? "anthropic/claude-3.7-sonnet",
+        },
+      },
       list: agentList,
     },
     channels: {},
@@ -167,7 +176,14 @@ export async function generatePoolConfig(
   };
 
   if (Object.keys(slackAccounts).length > 0) {
-    config.channels.slack = { accounts: slackAccounts };
+    // Top-level signingSecret + mode required by OpenClaw gateway validation
+    const firstAccount = Object.values(slackAccounts)[0];
+    config.channels.slack = {
+      mode: "http",
+      signingSecret: firstAccount?.signingSecret ?? "",
+      enabled: true,
+      accounts: slackAccounts,
+    };
   }
 
   const validated = openclawConfigSchema.parse(config);

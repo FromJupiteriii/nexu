@@ -36,7 +36,9 @@ const agentSchema = z.object({
 const agentsConfigSchema = z.object({
   defaults: z
     .object({
-      model: z.string().optional(),
+      model: z
+        .union([z.string(), z.object({ primary: z.string() })])
+        .optional(),
     })
     .optional(),
   list: z.array(agentSchema),
@@ -54,6 +56,9 @@ const slackAccountSchema = z.object({
 });
 
 const slackChannelSchema = z.object({
+  mode: z.enum(["socket", "http"]).optional(),
+  signingSecret: z.string().optional(),
+  enabled: z.boolean().optional(),
   accounts: z.record(z.string(), slackAccountSchema),
 });
 

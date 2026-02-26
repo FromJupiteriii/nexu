@@ -311,10 +311,13 @@ FROM bots b JOIN "user" u ON b.user_id = u.id;
 - If empty, disconnect and re-connect Slack via the UI
 
 ### Events arrive but Gateway gets 405 "Method Not Allowed"
-The Gateway's Slack webhook handler might not be registered. Check that:
-1. The generated config has `channels.slack.accounts.<id>.mode` set to `"http"`
-2. The `webhookPath` in the config matches what the API forwards to
-3. Gateway logs show Slack account initialization on startup
+The Gateway's Slack webhook handler is not registered. Check these in order:
+
+1. Gateway logs should show `[slack] http mode listening at /slack/events/<accountId>` on startup
+2. The generated config must have `channels.slack.accounts.<id>.mode` set to `"http"`
+3. The config must include `appToken` in each Slack account (even in HTTP mode — the OpenClaw plugin's `isConfigured` check requires it). The config generator adds a placeholder automatically.
+4. The config must have a top-level `channels.slack.signingSecret` and `channels.slack.mode: "http"`
+5. The `webhookPath` in the config must match what the API forwards to
 
 ### Gateway API key error (401 authentication_error)
 - Verify `ANTHROPIC_BASE_URL` points to your proxy (not api.anthropic.com)
