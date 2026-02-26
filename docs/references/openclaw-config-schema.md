@@ -9,10 +9,11 @@ Config 生成器必须输出符合此格式的 JSON。OpenClaw gateway 通过 ch
 ```jsonc
 {
   "gateway":  { /* 必填：服务器配置 */ },
+  "models":   { /* 可选：LLM provider（LiteLLM 等） */ },
   "agents":   { /* 必填：Agent 列表 */ },
   "channels": { /* 必填：Channel 账号 */ },
   "bindings": [ /* 必填：路由规则 */ ],
-  "models":   { /* 可选：LLM provider */ },
+  "commands": { /* 可选：命令控制 */ },
   "plugins":  { /* 可选：插件启用 */ }
 }
 ```
@@ -41,6 +42,60 @@ Config 生成器必须输出符合此格式的 JSON。OpenClaw gateway 通过 ch
 | `auth.mode` | `"none"` \| `"token"` | `"token"` | 认证模式 |
 | `auth.token` | string | - | 共享 token（`mode: "token"` 时必填） |
 | `reload.mode` | `"off"` \| `"hot"` \| `"hybrid"` | `"hybrid"` | 热加载策略 |
+
+---
+
+## models
+
+自定义 LLM 提供商配置。**当使用 LiteLLM 代理时必填。**
+
+```json
+{
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "litellm": {
+        "baseUrl": "https://litellm.example.com",
+        "apiKey": "sk-your-key",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "anthropic/claude-sonnet-4",
+            "name": "Claude Sonnet 4",
+            "reasoning": false,
+            "input": ["text", "image"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192,
+            "compat": { "supportsStore": false }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `mode` | `"merge"` \| `"replace"` | `merge` = 追加到内置 provider；`replace` = 覆盖 |
+| `providers.<name>.baseUrl` | string | Provider API 地址 |
+| `providers.<name>.apiKey` | string | API key |
+| `providers.<name>.api` | string | API 协议，LiteLLM 用 `"openai-completions"` |
+| `providers.<name>.models[].id` | string | 模型 ID（需与 provider 实际 ID 匹配） |
+| `providers.<name>.models[].compat.supportsStore` | boolean | **LiteLLM/Bedrock 必须设为 `false`**，否则发送 `store` 参数导致 400 |
+
+### 模型 ID 前缀规则
+
+在 `agents.defaults.model` 和 `agents.list[].model` 中引用自定义 provider 的模型时，必须加 provider 名称前缀：
+
+```
+原始 model ID:  anthropic/claude-sonnet-4
+引用时写:       litellm/anthropic/claude-sonnet-4
+              ^^^^^^^^ provider 名称作前缀
+```
+
+Config 生成器在检测到 `LITELLM_BASE_URL` 环境变量时会自动添加此前缀。
 
 ---
 
@@ -111,17 +166,27 @@ Config 生成器必须输出符合此格式的 JSON。OpenClaw gateway 通过 ch
 
 ### Slack
 
+Slack channel 有**顶层字段**和 **account 字段**两级。顶层控制全局默认策略，account 级别控制单个 workspace。
+
 ```json
 {
   "channels": {
     "slack": {
+      "mode": "http",
+      "signingSecret": "abc123",
+      "enabled": true,
+      "groupPolicy": "open",
+      "requireMention": false,
+      "dmPolicy": "open",
+      "allowFrom": ["*"],
       "accounts": {
         "slack-team-T123": {
           "enabled": true,
           "botToken": "xoxb-...",
           "signingSecret": "abc123",
           "mode": "http",
-          "webhookPath": "/slack/events/team-T123"
+          "webhookPath": "/slack/events/team-T123",
+          "appToken": "xapp-placeholder-not-used-in-http-mode"
         }
       }
     }
@@ -129,16 +194,30 @@ Config 生成器必须输出符合此格式的 JSON。OpenClaw gateway 通过 ch
 }
 ```
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `enabled` | boolean | 启用/禁用 |
-| `botToken` | string | Bot token (`xoxb-...`)，始终必填 |
-| `appToken` | string | App-level token (`xapp-...`)，Socket 模式必填 |
-| `signingSecret` | string | Signing secret，HTTP 模式必填 |
-| `mode` | `"socket"` \| `"http"` | 连接模式。多租户推荐 `"http"` |
-| `webhookPath` | string | HTTP 模式的 webhook 路径 |
-| `dmPolicy` | `"pairing"` \| `"allowlist"` \| `"open"` | 私聊策略 |
-| `groupPolicy` | `"open"` \| `"allowlist"` \| `"disabled"` | 频道消息策略 |
+#### 顶层字段（`channels.slack.*`）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `mode` | `"socket"` \| `"http"` | **是** | 连接模式，多租户必须 `"http"` |
+| `signingSecret` | string | **是** | 顶层需要一个 signingSecret（可用任一 account 的） |
+| `enabled` | boolean | 推荐 | 启用/禁用 |
+| `groupPolicy` | `"open"` \| `"allowlist"` \| `"disabled"` | **推荐** | 频道消息策略。**不设时运行时默认 `"allowlist"`，bot 会忽略所有频道消息** |
+| `requireMention` | boolean | **推荐** | 是否需要 @mention 才响应。**默认 `true`** |
+| `dmPolicy` | `"pairing"` \| `"allowlist"` \| `"open"` | **推荐** | 私聊策略 |
+| `allowFrom` | string[] | 条件必填 | 允许的用户/频道。**`dmPolicy: "open"` 时必须设为 `["*"]`** |
+
+#### account 字段（`channels.slack.accounts.<id>.*`）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `enabled` | boolean | 是 | 启用/禁用 |
+| `botToken` | string | **是** | Bot token (`xoxb-...`) |
+| `signingSecret` | string | HTTP 模式 | Signing secret |
+| `appToken` | string | **是** | HTTP 模式下也必填（placeholder 即可），用于通过 `isConfigured` 检查 |
+| `mode` | `"socket"` \| `"http"` | 是 | 连接模式 |
+| `webhookPath` | string | HTTP 模式 | webhook 路径，如 `/slack/events/slack-T123` |
+| `dmPolicy` | `"pairing"` \| `"allowlist"` \| `"open"` | 否 | 覆盖顶层 |
+| `groupPolicy` | `"open"` \| `"allowlist"` \| `"disabled"` | 否 | 覆盖顶层 |
 
 ---
 
@@ -175,6 +254,30 @@ Config 生成器必须输出符合此格式的 JSON。OpenClaw gateway 通过 ch
 5. **account（最常用：channel + accountId）**
 6. channel 通配（`accountId: "*"`）
 7. 默认 agent
+
+---
+
+## commands
+
+控制 Gateway 命令系统行为。Config 生成器自动设置。
+
+```json
+{
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `native` | `"auto"` \| `"off"` | 原生命令（`/help` 等） |
+| `nativeSkills` | `"auto"` \| `"off"` | 原生技能 |
+| `restart` | boolean | 是否允许通过命令重启 |
+| `ownerDisplay` | `"raw"` \| `"friendly"` | 用户名显示模式 |
 
 ---
 
@@ -258,6 +361,8 @@ Config 生成器必须输出符合此格式的 JSON。OpenClaw gateway 通过 ch
 
 ## 常见坑点
 
+### 基础
+
 1. **`accountId` 是 accounts 对象的 key，不是 appId**
    ```
    正确: "accountId": "feishu-acme"     (匹配 accounts.feishu-acme)
@@ -268,12 +373,34 @@ Config 生成器必须输出符合此格式的 JSON。OpenClaw gateway 通过 ch
 
 3. **省略 `accountId` 匹配的是 "default" 账号**，不是通配。通配用 `"*"`
 
-4. **飞书 webhook 模式必须设 `verificationToken`**，否则 schema 校验报错
+4. **一个 config 中只能有一个 `default: true` 的 agent**
 
-5. **Slack HTTP 模式必须设 `signingSecret`**，Socket 模式必须设 `appToken`
+5. **`workspace` 目录必须存在**，gateway 不会自动创建
 
-6. **`workspace` 目录必须存在**，gateway 不会自动创建
+### Slack 专项（极易踩坑）
 
-7. **`plugins.entries.feishu.enabled: true`** 是必需的，否则飞书插件不加载
+6. **`groupPolicy` 不设就是 `"allowlist"`** — Gateway 运行时 `resolveOpenProviderRuntimeGroupPolicy` 会在无显式配置时回退到 `"allowlist"`，导致 bot 默默丢弃所有频道消息而不报错。**务必显式设 `"groupPolicy": "open"`**。
 
-8. **一个 config 中只能有一个 `default: true` 的 agent**
+7. **`requireMention` 默认 `true`** — `defaultRequireMention` 在代码中 `?? true`。如果希望 bot 回应所有消息而非仅 @mention，需显式设 `false`。
+
+8. **`dmPolicy: "open"` 必须配套 `allowFrom: ["*"]`** — 否则 Gateway 启动时 schema 校验报错 `dmPolicy="open" requires allowFrom to include "*"`。
+
+9. **Slack HTTP 模式必须设 `signingSecret`**，Socket 模式必须设 `appToken`
+
+10. **Slack account 必须设 `appToken`（即使 HTTP 模式不用它）** — OpenClaw Slack 插件的 `isConfigured` 检查会验证该字段。用 `"xapp-placeholder-not-used-in-http-mode"` 占位即可。
+
+11. **顶层 `channels.slack` 需要 `mode` 和 `signingSecret`** — 不只是 account 里需要，顶层也得有，否则 gateway 验证不通过。
+
+### 模型（LiteLLM）
+
+12. **Model ID 必须加 provider 前缀** — agents 里写 `"litellm/anthropic/claude-sonnet-4"`，models.providers 里的 `id` 写 `"anthropic/claude-sonnet-4"`（无前缀）。
+
+13. **LiteLLM/Bedrock 模型必须设 `compat.supportsStore: false`** — OpenClaw 默认发送 `store: false` 参数（OpenAI 协议字段），Bedrock 不识别该字段会返回 400 `"store: Extra inputs are not permitted"`。
+
+14. **Model ID 必须与 provider 实际支持的匹配** — 用 `curl <base_url>/v1/models -H "Authorization: Bearer <key>"` 查看可用列表，不要凭猜测填。
+
+### 飞书
+
+15. **飞书 webhook 模式必须设 `verificationToken`**，否则 schema 校验报错
+
+16. **`plugins.entries.feishu.enabled: true`** 是必需的，否则飞书插件不加载

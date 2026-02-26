@@ -179,11 +179,13 @@ At this point, the API receives and logs events but the bot can't respond withou
 
 To make the bot actually respond, you need to run an OpenClaw Gateway locally.
 
+> **本地开发模式说明：** Gateway 直接从 OpenClaw 源码仓库 `dist/index.js` 启动，通过 `OPENCLAW_CONFIG_PATH` 指向 Nexu API 动态生成的配置文件。DB 中 `pod_ip=127.0.0.1` 使事件在本机内转发。配置变更后需手动重新生成并重启 Gateway。线上部署的区别见文末 [Local vs Production](#local-vs-production) 部分。
+
 ### Prerequisites
 
-- Node 22+ (`nvm install 22 && nvm use 22`)
-- OpenClaw repo cloned: `git clone https://github.com/openclaw/openclaw.git`
-- An AI provider (LiteLLM proxy, Anthropic API key, etc.)
+- Node 22+ (`nvm install 22 && nvm use 22`) — **Gateway 强制要求 22.12.0+**，dev server 可用 Node 20
+- OpenClaw repo cloned: `git clone https://github.com/openclaw/openclaw.git && cd openclaw && pnpm install && pnpm build`
+- LiteLLM proxy 或其他 OpenAI-compatible API endpoint
 
 ### 1. Set Up a Gateway Pool
 
@@ -203,83 +205,97 @@ UPDATE bots SET pool_id = 'pool_local_01' WHERE id = '<your-bot-id>';
 UPDATE webhook_routes SET pool_id = 'pool_local_01' WHERE channel_type = 'slack';
 ```
 
-### 2. Generate Gateway Config
+### 2. Configure LiteLLM Provider
 
-The API generates the config dynamically from the database:
+Config 生成器通过环境变量配置 LiteLLM。在 `apps/api/.env` 中添加：
+
+```env
+LITELLM_BASE_URL=https://litellm.example.com
+LITELLM_API_KEY=sk-your-key
+```
+
+**重要：** 设好后需重启 dev server（或 `touch apps/api/src/index.ts` 让 tsx watch 重新加载）。
+
+确认你的 bot 使用的 `model_id` 在 LiteLLM 上可用：
 
 ```bash
-curl -s http://localhost:3000/api/internal/pools/pool_local_01/config | python3 -m json.tool > gateway-config.json
+# 查看可用模型
+curl -s $LITELLM_BASE_URL/v1/models -H "Authorization: Bearer $LITELLM_API_KEY" \
+  | python3 -c "import sys,json; [print(m['id']) for m in json.load(sys.stdin)['data']]"
+
+# 更新 bot 的 model_id（必须与上面列表中的某个匹配）
+psql "postgresql://nexu:nexu@localhost:5433/nexu_dev" \
+  -c "UPDATE bots SET model_id = 'anthropic/claude-sonnet-4' WHERE slug = 'my-bot';"
 ```
 
-This endpoint is unauthenticated (internal use). It reads bots, channels, and credentials from the database and produces a full OpenClaw config.
+### 3. Generate Gateway Config
 
-Verify the config looks correct:
-```bash
-cat gateway-config.json
-```
-
-You should see:
-- `agents.list` — your bot
-- `channels.slack.accounts` — your Slack workspace with decrypted botToken and signingSecret
-- `bindings` — mapping agent to Slack account
-- `gateway.auth.token` — gateway authentication token
-
-#### Model Configuration
-
-The config generator uses the bot's `model_id` from the database. If your bot doesn't have one, add the model to `agents.defaults` in the generated config:
-
-```json
-{
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "anthropic/claude-3.7-sonnet"
-      }
-    },
-    "list": [...]
-  }
-}
-```
-
-The model name must match what your AI provider supports. Check with:
-```bash
-curl -s <your-provider-url>/v1/models -H "Authorization: Bearer <key>" | python3 -m json.tool
-```
-
-### 3. Start Gateway
+API 从数据库动态生成配置（含 LiteLLM provider、Slack credentials、policy 设置）：
 
 ```bash
-# Set AI provider credentials
-export ANTHROPIC_API_KEY=<your-api-key>
-export ANTHROPIC_BASE_URL=<your-provider-base-url>  # e.g. https://litellm.example.com
-
-# Set config paths
-export OPENCLAW_CONFIG_PATH=$(pwd)/gateway-config.json
-export OPENCLAW_STATE_DIR=/tmp/nexu-gateway-state
-
-# Start gateway (requires Node 22+)
-node /path/to/openclaw/openclaw.mjs gateway run --bind loopback --port 18789 --force
+curl -s http://localhost:3000/api/internal/pools/pool_local_01/config \
+  -H "Authorization: Bearer gw-secret-token" \
+  | python3 -m json.tool > gateway-config.json
 ```
 
-You should see:
+验证关键字段：
+```bash
+# 应该看到 litellm/ 前缀
+python3 -c "import json; d=json.load(open('gateway-config.json')); print('model:', d['agents']['defaults']['model']['primary'])"
+# → model: litellm/anthropic/claude-sonnet-4
+
+# 应该看到 models.providers.litellm
+python3 -c "import json; d=json.load(open('gateway-config.json')); print('has models:', 'models' in d)"
+# → has models: True
+
+# 应该看到 groupPolicy: open
+python3 -c "import json; d=json.load(open('gateway-config.json')); print('groupPolicy:', d['channels']['slack']['groupPolicy'])"
+# → groupPolicy: open
 ```
-[gateway] agent model: anthropic/claude-3.7-sonnet
+
+如果 `has models: False`，说明环境变量没生效 — 检查 `.env` 是否有 `LITELLM_BASE_URL` 和 `LITELLM_API_KEY`，重启 dev server。
+
+### 4. Start Gateway
+
+```bash
+# 切换到 Node 22（Gateway 强制要求）
+nvm use 22
+
+# 进入 OpenClaw 目录
+cd /path/to/openclaw
+
+# 启动 Gateway
+OPENCLAW_CONFIG_PATH=/path/to/gateway-config.json \
+  node dist/index.js gateway run --bind loopback --port 18789 --force --verbose
+```
+
+正常启动日志：
+```
+[gateway] agent model: litellm/anthropic/claude-sonnet-4
 [gateway] listening on ws://127.0.0.1:18789 (PID xxxxx)
+[slack] [slack-t123] starting provider
+[slack] http mode listening at /slack/events/slack-T123
 ```
 
-> **Note:** If using a LiteLLM proxy, `ANTHROPIC_BASE_URL` should be the base URL without `/v1` (e.g. `https://litellm.example.com`, not `https://litellm.example.com/v1`). The Anthropic SDK adds the API path automatically.
+> **关键注意事项：**
+> - 环境变量是 `OPENCLAW_CONFIG_PATH`（不是 `OPENCLAW_CONFIG`）
+> - 入口是 `dist/index.js`（需先 `pnpm build`），不是 chunk 文件
+> - `--verbose` 加上有助于调试，可以看到每条消息的处理过程
+> - `--force` 跳过端口占用检查
 
-### 4. Test End-to-End
+### 5. Test End-to-End
 
 1. In Slack, @mention your bot or DM it
 2. Watch the API logs for event forwarding:
    ```
-   [slack-events] team=T12345 event=app_mention
+   [slack-events] forwarding to http://127.0.0.1:18789/slack/events/slack-T123
+   [slack-events] gateway responded: status=200
    ```
 3. Watch the Gateway logs for AI processing:
    ```
-   [agent/embedded] embedded run agent start
-   [agent/embedded] embedded run agent end
+   [agent/embedded] embedded run start: provider=litellm model=anthropic/claude-sonnet-4
+   [agent/embedded] embedded run agent end: isError=false
+   slack: delivered 1 reply to channel:C123
    ```
 4. The bot should reply in Slack!
 
@@ -319,12 +335,97 @@ The Gateway's Slack webhook handler is not registered. Check these in order:
 4. The config must have a top-level `channels.slack.signingSecret` and `channels.slack.mode: "http"`
 5. The `webhookPath` in the config must match what the API forwards to
 
-### Gateway API key error (401 authentication_error)
-- Verify `ANTHROPIC_BASE_URL` points to your proxy (not api.anthropic.com)
-- Verify the model name exists on your provider (`curl <url>/v1/models`)
-- For LiteLLM: `ANTHROPIC_BASE_URL` should NOT include `/v1`
+### Gateway "Missing config" error
+- 环境变量是 `OPENCLAW_CONFIG_PATH`，不是 `OPENCLAW_CONFIG`（定义在 `src/config/paths.ts`）
+- 路径必须是绝对路径
 
-### Bot receives events but doesn't reply
-- Check Gateway logs for agent errors
-- Verify AI provider is reachable: `curl -s <ANTHROPIC_BASE_URL>/v1/models`
-- Make sure the model in config matches an available model on the provider
+### Gateway "requires Node >=22.12.0"
+- Gateway 强制要求 Node 22+，用 `nvm use 22` 切换
+- Nexu API dev server 可以用 Node 20
+
+### Bot 收到消息但不回复（无错误日志）
+
+这是最难排查的问题。Gateway 的 `prepareSlackMessage` 函数有 ~15 个 `return null` 点，任一条件不满足都会静默丢弃消息。
+
+**最常见原因：`groupPolicy` 默认是 `"allowlist"`**
+
+即使没有显式设置 `groupPolicy`，Gateway 运行时会回退到 `"allowlist"` 模式，导致所有频道消息被丢弃。日志中可能有（需 `--verbose`）：
+```
+slack: drop channel C123 (groupPolicy=allowlist, matchKey=none matchSource=none)
+slack: drop message (channel not allowed)
+```
+
+**解决：确保生成的配置中 `channels.slack.groupPolicy` 显式设为 `"open"`。**
+
+检查清单：
+1. `groupPolicy: "open"` — 否则频道消息全部被丢弃
+2. `requireMention: false` — 否则只响应 @mention
+3. `dmPolicy: "open"` + `allowFrom: ["*"]` — 否则私聊被拒
+4. 配置中有 `models.providers` — 否则报 "Unknown model"
+
+### Model error: "Unknown model: xxx"
+- 检查配置中是否有 `models.providers` 部分
+- 检查 `agents.defaults.model.primary` 是否有 `litellm/` 前缀
+- 如果 `LITELLM_BASE_URL` / `LITELLM_API_KEY` 环境变量缺失，config 生成器不会生成 `models` 段
+
+### LiteLLM 400 "store: Extra inputs are not permitted"
+- OpenClaw 默认向 OpenAI-compatible API 发送 `store: false` 参数
+- Bedrock（LiteLLM 后端之一）不支持该字段
+- 修复：模型配置中设 `"compat": { "supportsStore": false }`
+- Config 生成器已自动设置此项
+
+### LiteLLM 400 "Invalid model name"
+- Model ID 必须与 LiteLLM 服务器上注册的完全一致
+- 检查：`curl -s $LITELLM_BASE_URL/v1/models -H "Authorization: Bearer $LITELLM_API_KEY"`
+- 常见错误：数据库里的 `model_id` 是旧的或不存在的模型名
+
+### API 转发时 "Invalid JSON"
+- Hono 框架可能在 middleware 中已消费了 request body
+- `slack-events.ts` 使用 `c.req.text()` 读取 body，带有 fallback 到 `IncomingMessage`
+- 如果仍有问题，检查是否有其他 middleware 提前读了 body
+
+---
+
+## Local vs Production
+
+| 维度 | 本地开发 | 线上 K8s |
+|------|---------|---------|
+| Gateway 启动 | 手动 `node dist/index.js gateway run` | Pod 容器自动启动 |
+| 配置获取 | 手动 curl 保存文件，`OPENCLAW_CONFIG_PATH` 指向 | Pod 启动时调 `GET /api/internal/pools/{poolId}/config` 拉取 |
+| 配置更新 | 手动重新生成 + 重启 | `reload.mode: "hybrid"` 热加载，或 API 触发 |
+| Pod IP | `127.0.0.1` 硬编码 | K8s 分配，写入 `gateway_pools.pod_ip` |
+| 入口流量 | cloudflared 隧道 | K8s Ingress / Load Balancer |
+| Node 版本 | `nvm use 22` 手动切 | Docker 镜像固定 Node 22+ |
+| 秘钥管理 | `.env` 文件 | K8s Secrets 注入 |
+
+### 上线需要改什么
+
+总结：需要把 Gateway 容器化并实现启动时自动拉配置 + 注册 Pod IP，将 Slack 入口域名和秘钥迁移到 K8s Ingress/Secrets，补齐 Nexu API 到 Gateway 的配置变更通知链路（Gateway 自身已支持热加载，缺的是触发机制），以及将 Gateway 网络绑定从 loopback 改为 lan 以接受跨 Pod 流量。
+
+1. **Gateway Docker 镜像** — 基于 OpenClaw 构建，启动脚本在 entrypoint 中调用 Nexu API 拉取配置：
+   ```bash
+   # entrypoint.sh 示意
+   curl -s http://nexu-api:3000/api/internal/pools/$POOL_ID/config \
+     -H "Authorization: Bearer $GATEWAY_TOKEN" \
+     -o /app/config.json
+   OPENCLAW_CONFIG_PATH=/app/config.json node dist/index.js gateway run --bind lan --port 18789
+   ```
+
+2. **Pod IP 注册** — Pod 启动后需将自身 IP 写回 `gateway_pools.pod_ip`（通过 K8s downward API 或启动脚本调 Nexu API）
+
+3. **配置变更通知** — Gateway 自身已支持热加载（`reload.mode: "hybrid"`），缺的是触发机制。当用户在 Dashboard 修改 bot 设置后，需要有人通知 Gateway 重新拉配置。两种方式：
+   - Gateway 轮询：定期调 config 端点检查 `configVersion` 变更
+   - API 推送：调 Gateway 的 reload 端点触发
+
+4. **Slack Event Subscriptions URL** — 从 cloudflared 隧道改为正式域名：
+   ```
+   https://api.nexu.example.com/api/slack/events
+   ```
+
+5. **环境变量** — `.env` 中的秘钥改为 K8s Secrets：
+   - `LITELLM_BASE_URL` / `LITELLM_API_KEY` → Secret
+   - `GATEWAY_TOKEN` → Secret
+   - `ENCRYPTION_KEY` → Secret
+   - `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` → Secret
+
+6. **`gateway.bind`** — 从 `"loopback"` 改为 `"lan"`。loopback 只绑 `127.0.0.1`，K8s 中 API Pod 和 Gateway Pod 是不同 IP，需要 `lan`（绑 `0.0.0.0`）才能接受跨 Pod 的事件转发请求

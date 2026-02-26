@@ -96,6 +96,19 @@ export async function generatePoolConfig(
     }
   }
 
+  // LiteLLM provider config from env vars
+  const litellmBaseUrl = process.env.LITELLM_BASE_URL;
+  const litellmApiKey = process.env.LITELLM_API_KEY;
+  const hasLitellm = Boolean(litellmBaseUrl && litellmApiKey);
+
+  // Prefix model ID with "litellm/" when LiteLLM is configured
+  function resolveModelId(rawModelId: string): string {
+    if (!hasLitellm) return rawModelId;
+    // Already prefixed — skip
+    if (rawModelId.startsWith("litellm/")) return rawModelId;
+    return `litellm/${rawModelId}`;
+  }
+
   const agentList: AgentConfig[] = activeBots.map((bot, index) => {
     const agent: AgentConfig = {
       id: bot.slug,
@@ -107,7 +120,7 @@ export async function generatePoolConfig(
     }
 
     if (bot.modelId) {
-      agent.model = { primary: bot.modelId };
+      agent.model = { primary: resolveModelId(bot.modelId) };
     }
 
     return agent;
@@ -151,6 +164,14 @@ export async function generatePoolConfig(
     }
   }
 
+  // Collect unique model IDs across all active bots for LiteLLM provider config
+  const uniqueModelIds = [
+    ...new Set(activeBots.map((b) => b.modelId).filter(Boolean) as string[]),
+  ];
+  const defaultModelId = resolveModelId(
+    activeBots[0]?.modelId ?? "anthropic/claude-3.7-sonnet",
+  );
+
   const config: OpenClawConfig = {
     gateway: {
       port: 18789,
@@ -164,16 +185,37 @@ export async function generatePoolConfig(
     },
     agents: {
       defaults: {
-        model: {
-          // Use the first bot's model or a sensible default
-          primary: activeBots[0]?.modelId ?? "anthropic/claude-3.7-sonnet",
-        },
+        model: { primary: defaultModelId },
       },
       list: agentList,
     },
     channels: {},
     bindings: bindingsList,
   };
+
+  // Add LiteLLM model provider when configured via env vars
+  if (hasLitellm) {
+    config.models = {
+      mode: "merge",
+      providers: {
+        litellm: {
+          baseUrl: litellmBaseUrl!,
+          apiKey: litellmApiKey!,
+          api: "openai-completions",
+          models: uniqueModelIds.map((id) => ({
+            id,
+            name: id,
+            reasoning: false,
+            input: ["text", "image"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 200000,
+            maxTokens: 8192,
+            compat: { supportsStore: false },
+          })),
+        },
+      },
+    };
+  }
 
   if (Object.keys(slackAccounts).length > 0) {
     // Top-level signingSecret + mode required by OpenClaw gateway validation
@@ -182,9 +224,21 @@ export async function generatePoolConfig(
       mode: "http",
       signingSecret: firstAccount?.signingSecret ?? "",
       enabled: true,
+      groupPolicy: "open",
+      requireMention: false,
+      dmPolicy: "open",
+      allowFrom: ["*"],
       accounts: slackAccounts,
     };
   }
+
+  // Standard command config for multi-tenant gateway
+  config.commands = {
+    native: "auto",
+    nativeSkills: "auto",
+    restart: true,
+    ownerDisplay: "raw",
+  };
 
   const validated = openclawConfigSchema.parse(config);
 

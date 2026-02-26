@@ -225,17 +225,23 @@ Rules:
 
 ### Config generator (核心模块)
 
-- Location: `apps/api/src/config-generator.ts`
+- Location: `apps/api/src/lib/config-generator.ts`
 - Input: `poolId`
-- Output: Valid `OpenClawConfig` JSON
+- Output: Valid `OpenClawConfig` JSON（含 models、agents、channels、bindings、commands）
+- Schema: `packages/shared/src/schemas/openclaw-config.ts`
 - Must read: `docs/references/openclaw-config-schema.md`
-- Define output schema with Zod to validate generated config
 - Currently only Slack channel is supported
+- **Environment variables:**
+  - `LITELLM_BASE_URL` + `LITELLM_API_KEY` — 配置后自动生成 `models.providers.litellm` 段
+  - `GATEWAY_TOKEN` — Gateway 认证 token
+- **Model ID 处理:** 当 LiteLLM 配置存在时，自动给 model ID 加 `litellm/` 前缀
 - Critical constraints:
   - `bindings[].agentId` must match `agents.list[].id`
   - `bindings[].match.accountId` must match `channels.slack.accounts` key (NOT botToken)
   - Slack HTTP mode requires `signingSecret`
   - Only one agent should have `default: true`
+  - Slack channel 必须显式设 `groupPolicy: "open"`（运行时默认 `"allowlist"` 会丢弃消息）
+  - LiteLLM 模型必须设 `compat.supportsStore: false`（避免 Bedrock 400 错误）
 
 ### Auth (better-auth)
 

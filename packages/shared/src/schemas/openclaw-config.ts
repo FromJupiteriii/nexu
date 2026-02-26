@@ -59,6 +59,10 @@ const slackChannelSchema = z.object({
   mode: z.enum(["socket", "http"]).optional(),
   signingSecret: z.string().optional(),
   enabled: z.boolean().optional(),
+  groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+  requireMention: z.boolean().optional(),
+  dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+  allowFrom: z.array(z.string()).optional(),
   accounts: z.record(z.string(), slackAccountSchema),
 });
 
@@ -76,11 +80,55 @@ const bindingSchema = z.object({
   match: bindingMatchSchema,
 });
 
+// Model provider configuration for LiteLLM / custom endpoints
+const modelCompatSchema = z.object({
+  supportsStore: z.boolean().optional(),
+}).passthrough();
+
+const modelCostSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number().optional(),
+  cacheWrite: z.number().optional(),
+});
+
+const modelEntrySchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  reasoning: z.boolean().optional(),
+  input: z.array(z.string()).optional(),
+  cost: modelCostSchema.optional(),
+  contextWindow: z.number().optional(),
+  maxTokens: z.number().optional(),
+  compat: modelCompatSchema.optional(),
+});
+
+const modelProviderSchema = z.object({
+  baseUrl: z.string(),
+  apiKey: z.string(),
+  api: z.string(),
+  models: z.array(modelEntrySchema),
+}).passthrough();
+
+const modelsConfigSchema = z.object({
+  mode: z.enum(["merge", "replace"]).optional(),
+  providers: z.record(z.string(), modelProviderSchema),
+});
+
+const commandsConfigSchema = z.object({
+  native: z.enum(["auto", "off"]).optional(),
+  nativeSkills: z.enum(["auto", "off"]).optional(),
+  restart: z.boolean().optional(),
+  ownerDisplay: z.enum(["raw", "friendly"]).optional(),
+}).passthrough();
+
 export const openclawConfigSchema = z.object({
   gateway: gatewayConfigSchema,
+  models: modelsConfigSchema.optional(),
   agents: agentsConfigSchema,
   channels: channelsConfigSchema,
   bindings: z.array(bindingSchema),
+  commands: commandsConfigSchema.optional(),
 });
 
 export type OpenClawConfig = z.infer<typeof openclawConfigSchema>;

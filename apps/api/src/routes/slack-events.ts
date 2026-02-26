@@ -59,11 +59,15 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         return c.json({ ok: true });
       }
 
-      // Read body from Node.js IncomingMessage directly (avoids Hono body reading issue)
-      const incoming = (c.env as { incoming: IncomingMessage }).incoming;
+      // Read body — try Hono first, fall back to raw IncomingMessage
       let rawBody: string;
       try {
-        rawBody = await readIncomingBody(incoming);
+        rawBody = await c.req.text();
+        if (!rawBody) {
+          // Hono might have already consumed the body; try raw IncomingMessage
+          const incoming = (c.env as { incoming: IncomingMessage }).incoming;
+          rawBody = await readIncomingBody(incoming);
+        }
         console.log(`[slack-events] body length=${rawBody.length}`);
       } catch (err) {
         console.error("[slack-events] Failed to read body:", err);
@@ -182,19 +186,25 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
 
       // Forward to gateway pod
       const gatewayUrl = `http://${podIp}:18789/slack/events/${accountId}`;
+      console.log(
+        `[slack-events] forwarding to ${gatewayUrl} ts=${timestamp} sig=${signature.slice(0, 20)}...`,
+      );
 
       try {
         const gatewayResp = await fetch(gatewayUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Slack-Request-Timestamp": timestamp,
-            "X-Slack-Signature": signature,
+            "x-slack-request-timestamp": timestamp,
+            "x-slack-signature": signature,
           },
           body: rawBody,
         });
 
         const respBody = await gatewayResp.text();
+        console.log(
+          `[slack-events] gateway responded: status=${gatewayResp.status} body=${respBody.slice(0, 200)}`,
+        );
         return new Response(respBody, {
           status: gatewayResp.status,
           headers: { "Content-Type": "application/json" },
