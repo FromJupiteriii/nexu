@@ -77,13 +77,14 @@ export async function bootstrapGateway(): Promise<void> {
     configPath: env.OPENCLAW_CONFIG_PATH,
     manageOpenclawProcess: env.RUNTIME_MANAGE_OPENCLAW_PROCESS,
   });
+  await registerPoolWithRetry();
+  log("pool registered", { poolId: env.RUNTIME_POOL_ID });
+
+  await fetchInitialConfigWithRetry();
+
   if (env.RUNTIME_MANAGE_OPENCLAW_PROCESS) {
     startManagedOpenclawGateway();
   }
 
   await waitGatewayReady();
-  await registerPoolWithRetry();
-  log("pool registered", { poolId: env.RUNTIME_POOL_ID });
-
-  await fetchInitialConfigWithRetry();
 }
