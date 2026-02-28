@@ -37,6 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_COMMIT_HASH: ${{ github.sha }}
+      VITE_AUTH_BASE_URL: ${{ vars.VITE_AUTH_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
