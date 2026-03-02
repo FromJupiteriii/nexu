@@ -78,8 +78,8 @@ export function createApp() {
 
   app.onError((error, c) => {
     const handled = resolveErrorHandling(c, error);
-    logHandledError(c, handled.level, handled.body);
-    return c.json(handled.body, handled.status);
+    logHandledError(c, handled.level, handled.logBody);
+    return c.json(handled.responseBody, handled.status);
   });
 
   return app;

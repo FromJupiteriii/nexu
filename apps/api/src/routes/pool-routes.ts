@@ -154,7 +154,7 @@ export function registerPoolRoutes(app: OpenAPIHono<AppBindings>) {
         {
           code: "pool_get_config_failed",
           pool_id: poolId,
-          original_error: baseError.toJSON().error,
+          message: baseError.message,
         },
         { cause: baseError },
       );

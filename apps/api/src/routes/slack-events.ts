@@ -81,7 +81,7 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         });
       } catch (err) {
         const unknownError = BaseError.from(err);
-        logger.error({
+        logger.warn({
           message: "slack_events_body_read_failed",
           scope: "slack_events_body_read",
           ...unknownError.toJSON(),
@@ -297,7 +297,7 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
           })
           .catch((err) => {
             const unknownError = BaseError.from(err);
-            logger.error({
+            logger.warn({
               message: "slack_events_session_upsert_failed",
               scope: "slack_events_session_upsert",
               session_key: sessionKey,
@@ -357,7 +357,7 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         });
       } catch (err) {
         const unknownError = BaseError.from(err);
-        logger.error({
+        logger.warn({
           message: "slack_events_gateway_forward_failed",
           scope: "slack_events_gateway_forward",
           pool_id: route.poolId,
@@ -368,7 +368,7 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       }
     } catch (err) {
       const unknownError = BaseError.from(err);
-      logger.error({
+      logger.warn({
         message: "slack_events_unhandled_error",
         scope: "slack_events_handler",
         ...unknownError.toJSON(),

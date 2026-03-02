@@ -107,6 +107,25 @@ function buildErrorBody(
   };
 }
 
+function buildResponseBody(
+  baseError: BaseError,
+  requestId: string | undefined,
+): {
+  error: {
+    type: string;
+    message: string;
+  };
+  requestId?: string;
+} {
+  return {
+    error: {
+      type: baseError.type,
+      message: baseError.message,
+    },
+    ...(requestId ? { requestId } : {}),
+  };
+}
+
 export function resolveErrorHandling(
   c: Context<AppBindings>,
   error: unknown,
@@ -114,18 +133,27 @@ export function resolveErrorHandling(
   baseError: BaseError;
   status: ErrorHttpStatus;
   level: "error" | "warn" | "info";
-  body: { error: Record<string, unknown> };
+  logBody: { error: Record<string, unknown> };
+  responseBody: {
+    error: {
+      type: string;
+      message: string;
+    };
+    requestId?: string;
+  };
 } {
   const baseError = BaseError.from(error);
   const policy = mergeErrorPolicy(c.get("errorPolicy"));
   const status = policy.resolveStatus(baseError, c);
   const stackLineLimit = getStackLimitLines();
+  const requestId = c.get("requestId");
 
   return {
     baseError,
     status,
     level: policy.resolveLevel(baseError, status, c),
-    body: buildErrorBody(baseError, stackLineLimit),
+    logBody: buildErrorBody(baseError, stackLineLimit),
+    responseBody: buildResponseBody(baseError, requestId),
   };
 }
 
