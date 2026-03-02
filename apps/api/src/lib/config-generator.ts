@@ -2,6 +2,7 @@ import type {
   AgentConfig,
   BindingConfig,
   DiscordAccountConfig,
+  FeishuAccountConfig,
   OpenClawConfig,
   SlackAccountConfig,
 } from "@nexu/shared";
@@ -136,6 +137,7 @@ export async function generatePoolConfig(
 
   const slackAccounts: Record<string, SlackAccountConfig> = {};
   const discordAccounts: Record<string, DiscordAccountConfig> = {};
+  const feishuAccounts: Record<string, FeishuAccountConfig> = {};
   const bindingsList: BindingConfig[] = [];
 
   for (const ch of channelsWithBots) {
@@ -197,6 +199,32 @@ export async function generatePoolConfig(
         agentId: ch.botSlug,
         match: {
           channel: "discord",
+          accountId: ch.accountId,
+        },
+      });
+    } else if (ch.channelType === "feishu") {
+      const credMap = new Map<string, string>();
+      for (const cred of ch.credentials) {
+        try {
+          credMap.set(cred.credentialType, decrypt(cred.encryptedValue));
+        } catch {
+          credMap.set(cred.credentialType, "");
+        }
+      }
+
+      const appId = credMap.get("appId") ?? "";
+      const appSecret = credMap.get("appSecret") ?? "";
+
+      feishuAccounts[ch.accountId] = {
+        enabled: true,
+        appId,
+        appSecret,
+      };
+
+      bindingsList.push({
+        agentId: ch.botSlug,
+        match: {
+          channel: "feishu",
           accountId: ch.accountId,
         },
       });
@@ -297,6 +325,18 @@ export async function generatePoolConfig(
       dmPolicy: "open",
       allowFrom: ["*"],
       accounts: discordAccounts,
+    };
+  }
+
+  if (Object.keys(feishuAccounts).length > 0) {
+    config.channels.feishu = {
+      enabled: true,
+      connectionMode: "websocket",
+      dmPolicy: "open",
+      groupPolicy: "open",
+      requireMention: false,
+      allowFrom: ["*"],
+      accounts: feishuAccounts,
     };
   }
 

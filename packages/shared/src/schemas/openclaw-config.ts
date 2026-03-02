@@ -89,9 +89,26 @@ const discordChannelSchema = z.object({
   accounts: z.record(z.string(), discordAccountSchema),
 });
 
+const feishuAccountSchema = z.object({
+  enabled: z.boolean().default(true),
+  appId: z.string(),
+  appSecret: z.string(),
+});
+
+const feishuChannelSchema = z.object({
+  enabled: z.boolean().optional(),
+  connectionMode: z.enum(["websocket", "webhook"]).optional(),
+  dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+  groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+  requireMention: z.boolean().optional(),
+  allowFrom: z.array(z.string()).optional(),
+  accounts: z.record(z.string(), feishuAccountSchema),
+});
+
 const channelsConfigSchema = z.object({
   slack: slackChannelSchema.optional(),
   discord: discordChannelSchema.optional(),
+  feishu: feishuChannelSchema.optional(),
 });
 
 const bindingMatchSchema = z.object({
@@ -222,4 +239,5 @@ export type OpenClawConfig = z.infer<typeof openclawConfigSchema>;
 export type AgentConfig = z.infer<typeof agentSchema>;
 export type SlackAccountConfig = z.infer<typeof slackAccountSchema>;
 export type DiscordAccountConfig = z.infer<typeof discordAccountSchema>;
+export type FeishuAccountConfig = z.infer<typeof feishuAccountSchema>;
 export type BindingConfig = z.infer<typeof bindingSchema>;
