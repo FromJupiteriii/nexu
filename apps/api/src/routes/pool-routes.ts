@@ -14,8 +14,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bots, gatewayPools, poolSecrets } from "../db/schema/index.js";
 import { generatePoolConfig } from "../lib/config-generator.js";
-import { BaseError, ServiceError } from "../lib/error.js";
 import { decrypt, encrypt } from "../lib/crypto.js";
+import { BaseError, ServiceError } from "../lib/error.js";
 import { requireInternalToken } from "../middleware/internal-auth.js";
 import {
   getPoolConfigSnapshotByVersion,
