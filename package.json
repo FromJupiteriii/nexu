@@ -15,6 +15,13 @@
     "test": "pnpm -r test",
     "generate-types": "pnpm --filter @nexu/api generate-openapi && pnpm --filter @nexu/web generate-sdk",
     "seed": "pnpm --filter @nexu/api db:seed",
+    "db:generate": "pnpm --filter @nexu/api db:generate",
+    "db:migrate": "pnpm --filter @nexu/api db:migrate",
+    "db:check-sync": "pnpm --filter @nexu/api db:check-sync",
+    "db:check-sync:missing": "pnpm --filter @nexu/api db:check-sync:missing",
+    "db:check-sync:mismatch": "pnpm --filter @nexu/api db:check-sync:mismatch",
+    "db:check-dangerous": "pnpm --filter @nexu/api db:check-dangerous",
+    "db:check-dangerous-sql": "pnpm --filter @nexu/api db:check-dangerous-sql",
     "db:push": "pnpm --filter @nexu/api db:push"
   },
   "devDependencies": {
