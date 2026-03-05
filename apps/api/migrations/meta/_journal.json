@@ -22,6 +22,13 @@
       "when": 1772694061321,
       "tag": "0002_artifacts_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772701141453,
+      "tag": "0003_curly_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }
