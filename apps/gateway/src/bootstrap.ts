@@ -1,5 +1,6 @@
 import type { Dirent } from "node:fs";
 import { readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkSlackTokens, registerPool } from "./api.js";
 import { fetchInitialConfig } from "./config.js";
@@ -157,6 +158,41 @@ async function clearStaleSessionLocks(): Promise<void> {
   }
 }
 
+/**
+ * Clear stale OpenClaw gateway lock files left behind after unclean exits.
+ * Lock files live in `os.tmpdir()/openclaw-<uid>/gateway.<hash>.lock`.
+ * Without this cleanup, a stale lock causes `GatewayLockError` → exit(1).
+ */
+async function clearStaleGatewayLocks(): Promise<void> {
+  if (!env.RUNTIME_MANAGE_OPENCLAW_PROCESS) {
+    return;
+  }
+
+  const uid =
+    typeof process.getuid === "function" ? process.getuid() : undefined;
+  const suffix = uid != null ? `openclaw-${uid}` : "openclaw";
+  const lockDir = join(tmpdir(), suffix);
+
+  let files: string[];
+  try {
+    files = await readdir(lockDir);
+  } catch {
+    return; // lock dir doesn't exist
+  }
+
+  let removed = 0;
+  for (const file of files) {
+    if (file.startsWith("gateway.") && file.endsWith(".lock")) {
+      await rm(join(lockDir, file), { force: true });
+      removed++;
+    }
+  }
+
+  if (removed > 0) {
+    logger.info({ count: removed, lockDir }, "cleared stale gateway locks");
+  }
+}
+
 async function touchConfigFile(): Promise<void> {
   try {
     const content = await readFile(env.OPENCLAW_CONFIG_PATH, "utf8");
@@ -282,6 +318,7 @@ export async function bootstrapGateway(state: RuntimeState): Promise<void> {
   );
 
   await clearStaleSessionLocks();
+  await clearStaleGatewayLocks();
 
   if (env.RUNTIME_MANAGE_OPENCLAW_PROCESS) {
     startManagedOpenclawGateway();

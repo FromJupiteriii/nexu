@@ -157,6 +157,8 @@ export async function probeGatewayDeepHealth(): Promise<GatewayProbeResult> {
   return runCliProbe("deep");
 }
 
+const MAX_READY_ATTEMPTS = 120; // give up after ~2 minutes
+
 export async function waitGatewayReady(): Promise<void> {
   if (!env.RUNTIME_GATEWAY_PROBE_ENABLED) {
     return;
@@ -173,6 +175,18 @@ export async function waitGatewayReady(): Promise<void> {
           latencyMs: result.latencyMs,
         },
         "gateway is ready",
+      );
+      return;
+    }
+
+    if (attempt >= MAX_READY_ATTEMPTS) {
+      logger.error(
+        {
+          event: "gateway_ready_timeout",
+          attempts: attempt,
+          maxAttempts: MAX_READY_ATTEMPTS,
+        },
+        "gateway failed to become ready; continuing bootstrap",
       );
       return;
     }

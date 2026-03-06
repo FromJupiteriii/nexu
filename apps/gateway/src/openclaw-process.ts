@@ -1,4 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fetchInitialConfig } from "./config.js";
 import { env } from "./env.js";
@@ -97,6 +99,22 @@ function scheduleRestart(
           ).toJSON(),
           "failed to refresh config before restart; proceeding anyway",
         );
+      }
+
+      // Clear stale gateway lock files left by the crashed process
+      try {
+        const uid =
+          typeof process.getuid === "function" ? process.getuid() : undefined;
+        const suffix = uid != null ? `openclaw-${uid}` : "openclaw";
+        const lockDir = path.join(tmpdir(), suffix);
+        const files = await readdir(lockDir);
+        for (const file of files) {
+          if (file.startsWith("gateway.") && file.endsWith(".lock")) {
+            await rm(path.join(lockDir, file), { force: true });
+          }
+        }
+      } catch {
+        // lock dir may not exist
       }
 
       startManagedOpenclawGateway();

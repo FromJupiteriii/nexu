@@ -424,36 +424,18 @@ export function SlackOAuthView({
           </div>
           <div className="ml-11 space-y-4">
             <div className="space-y-2.5 mb-2">
-              <div className="flex gap-2.5 items-start">
-                <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
-                  1
-                </div>
-                <a
-                  href="https://api.slack.com/apps"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex gap-1.5 items-center px-3 py-1.5 text-[12px] font-medium text-white rounded-lg bg-[#4A154B] hover:bg-[#3a1039] transition-all"
-                >
-                  <ExternalLink size={11} />
-                  Open Slack App Dashboard
-                </a>
-              </div>
               {[
-                <span key="2">
-                  Click on the app you just created (e.g.{" "}
-                  <strong className="text-text-primary">"Nexu"</strong>)
-                </span>,
-                <span key="3">
+                <span key="1">
                   Go to{" "}
                   <strong className="text-text-primary">
                     Basic Information
                   </strong>
                 </span>,
-                <span key="4">
+                <span key="2">
                   Scroll to{" "}
                   <strong className="text-text-primary">App Credentials</strong>
                 </span>,
-                <span key="5">
+                <span key="3">
                   Copy the{" "}
                   <strong className="text-text-primary">Signing Secret</strong>{" "}
                   and paste it below
@@ -461,7 +443,7 @@ export function SlackOAuthView({
               ].map((item, idx) => (
                 <div key={item.key} className="flex gap-2.5 items-start">
                   <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
-                    {idx + 2}
+                    {idx + 1}
                   </div>
                   <span className="text-[12px] text-text-secondary leading-relaxed">
                     {item}
