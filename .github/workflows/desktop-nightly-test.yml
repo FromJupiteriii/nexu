@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: "0 17 * * *"
 
+permissions:
+  contents: write
+  actions: write
+
 concurrency:
   group: desktop-nightly-test
   cancel-in-progress: false
