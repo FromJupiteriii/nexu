@@ -241,7 +241,7 @@ async function ensureDesktopAppUser(authUserId: string): Promise<void> {
         [
           botId,
           runtimeConfig.desktopAuth.appUserId,
-          process.env.DEFAULT_MODEL_ID ?? "anthropic/claude-sonnet-4",
+          process.env.DEFAULT_MODEL_ID ?? "link/claude-sonnet-4-5",
           gatewayPoolId,
           now,
           now,

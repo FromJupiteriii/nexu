@@ -43,6 +43,10 @@ const zhCN = {
   "welcome.cancel": "取消",
   "welcome.connectFailed": "连接失败，请稍后重试",
   "welcome.cloudConnectError": "无法连接到 Nexu 云端服务",
+  "welcome.cloudConnectInProgress":
+    "浏览器登录已在进行中，请到浏览器完成授权。",
+  "welcome.browserOpened": "已打开浏览器登录，请在浏览器中完成授权。",
+  "welcome.connectCancelled": "已取消浏览器登录。",
 
   // ── Auth ──
   "auth.terms": "服务条款",

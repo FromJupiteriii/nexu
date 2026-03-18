@@ -40,6 +40,42 @@ function ensureDir(path: string): string {
   return path;
 }
 
+function resetDir(path: string): string {
+  rmSync(path, { recursive: true, force: true });
+  mkdirSync(path, { recursive: true });
+  return path;
+}
+
+const PGLITE_STATE_VERSION = "0.4.0";
+
+function readPgliteStateVersion(runtimeRoot: string): string | null {
+  const versionPath = path.resolve(runtimeRoot, "pglite-version.txt");
+
+  try {
+    return readFileSync(versionPath, "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function writePgliteStateVersion(runtimeRoot: string, version: string): void {
+  const versionPath = path.resolve(runtimeRoot, "pglite-version.txt");
+  writeFileSync(versionPath, `${version}\n`);
+}
+
+function ensurePgliteDataDir(runtimeRoot: string): string {
+  const pgliteDataPath = path.resolve(runtimeRoot, "pglite");
+  const existingVersion = readPgliteStateVersion(runtimeRoot);
+
+  if (existingVersion !== PGLITE_STATE_VERSION) {
+    resetDir(pgliteDataPath);
+    writePgliteStateVersion(runtimeRoot, PGLITE_STATE_VERSION);
+    return pgliteDataPath;
+  }
+
+  return ensureDir(pgliteDataPath);
+}
+
 function getBooleanEnv(name: string, fallback: boolean): boolean {
   const value = process.env[name];
 
@@ -225,7 +261,7 @@ export function createRuntimeUnitManifests(
   const logsDir = ensureDir(
     path.resolve(userDataPath, "../logs/runtime-units"),
   );
-  const pgliteDataPath = ensureDir(path.resolve(runtimeRoot, "pglite"));
+  const pgliteDataPath = ensurePgliteDataDir(runtimeRoot);
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(
     path.resolve(openclawRuntimeRoot, "config"),

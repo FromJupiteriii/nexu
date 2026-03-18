@@ -44,7 +44,6 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 - **`apps/api/`** — Hono backend. Routes in `src/routes/`, DB schema in `src/db/schema/index.ts`, config generator in `src/lib/config-generator.ts`, auth in `src/auth.ts`.
 - **`apps/web/`** — React frontend. Pages in `src/pages/`, generated SDK in `lib/api/`, auth client in `src/lib/auth-client.ts`.
-- **`apps/chat/`** — Next.js session-chat surface for local OpenClaw probing.
 - **`apps/desktop/`** — Electron desktop runtime shell and sidecar orchestrator.
 - **`packages/shared/`** — Shared Zod schemas in `src/schemas/`. Includes bot, channel, gateway, invite, model, skill, and OpenClaw config schemas.
 - **`nexu-skills/`** — Public skill repository. Each skill is a directory with `SKILL.md` frontmatter. `skills.json` is the built catalog index.

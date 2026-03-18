@@ -887,6 +887,25 @@ export type PostApiV1AuthDesktopAuthorizeData = {
     url: '/api/v1/auth/desktop-authorize';
 };
 
+export type PostApiV1AuthDesktopAuthorizeErrors = {
+    /**
+     * Device not found
+     */
+    404: {
+        ok: boolean;
+        error?: string;
+    };
+    /**
+     * Authorization expired
+     */
+    410: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiV1AuthDesktopAuthorizeError = PostApiV1AuthDesktopAuthorizeErrors[keyof PostApiV1AuthDesktopAuthorizeErrors];
+
 export type PostApiV1AuthDesktopAuthorizeResponses = {
     /**
      * Authorization result

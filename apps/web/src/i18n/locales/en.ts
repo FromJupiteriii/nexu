@@ -45,6 +45,11 @@ const en = {
   "welcome.cancel": "Cancel",
   "welcome.connectFailed": "Connection failed, please try again",
   "welcome.cloudConnectError": "Unable to connect to Nexu cloud service",
+  "welcome.cloudConnectInProgress":
+    "Browser sign-in is already in progress. Please finish it in your browser.",
+  "welcome.browserOpened":
+    "Browser sign-in opened. Finish it in your browser to continue.",
+  "welcome.connectCancelled": "Browser sign-in cancelled.",
 
   // ── Auth ──
   "auth.terms": "Terms of Service",
