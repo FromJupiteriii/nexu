@@ -30,6 +30,7 @@ const enSidebar = [
     items: [
       { text: "Contributing", link: "/guide/contributing" },
       { text: "Contact Us", link: "/guide/contact" },
+      { text: "Changelog", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
 ];
@@ -64,13 +65,14 @@ const zhSidebar = [
     items: [
       { text: "参与贡献", link: "/zh/guide/contributing" },
       { text: "联系我们", link: "/zh/guide/contact" },
+      { text: "更新日志", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
 ];
 
 export default defineConfig({
-  title: "Nexu Docs",
-  description: "Nexu documentation for channels, models, and skills.",
+  title: "nexu",
+  description: "nexu documentation for channels, models, and skills.",
   cleanUrls: true,
   lastUpdated: true,
   rewrites: {
@@ -81,15 +83,15 @@ export default defineConfig({
     root: {
       label: "English",
       lang: "en-US",
-      title: "Nexu Docs",
-      description: "Nexu documentation for channels, models, and skills.",
+      title: "nexu",
+      description: "nexu documentation for channels, models, and skills.",
       link: "/",
     },
     zh: {
       label: "简体中文",
       lang: "zh-CN",
-      title: "Nexu 文档",
-      description: "Nexu 的渠道、模型与技能文档。",
+      title: "nexu",
+      description: "nexu 的渠道、模型与技能文档。",
       link: "/zh/",
     },
   },
