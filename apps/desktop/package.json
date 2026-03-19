@@ -40,6 +40,7 @@
     "clsx": "^2.1.1",
     "electron-updater": "^6.3.9",
     "lucide-react": "^0.474.0",
+    "npm": "^11",
     "pg": "^8.13.1",
     "pino": "^10.3.1",
     "react": "^19.2.4",
@@ -81,6 +82,10 @@
       {
         "from": ".dist-runtime",
         "to": "runtime"
+      },
+      {
+        "from": "static/bundled-skills",
+        "to": "static/bundled-skills"
       },
       {
         "from": "build-config.json",

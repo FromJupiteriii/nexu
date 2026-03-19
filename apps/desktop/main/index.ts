@@ -562,9 +562,17 @@ app.whenReady().then(async () => {
       });
     }
 
-    catalogMgr = new CatalogManager(
-      app.getPath("userData"),
-      (level, message) => {
+    // Resolve static bundled-skills dir: packaged app has it in resources/,
+    // dev mode has it relative to the repo root.
+    // Resolve static bundled-skills dir: packaged app has it in resources/,
+    // dev mode has it relative to the app root.
+    const staticSkillsDir = app.isPackaged
+      ? resolve(process.resourcesPath ?? "", "static/bundled-skills")
+      : resolve(app.getAppPath(), "static/bundled-skills");
+
+    catalogMgr = new CatalogManager(app.getPath("userData"), {
+      staticSkillsDir,
+      log: (level, message) => {
         writeDesktopMainLog({
           source: "skillhub",
           stream: level === "error" ? "stderr" : "stdout",
@@ -573,9 +581,22 @@ app.whenReady().then(async () => {
           logFilePath: getDesktopLogFilePath("desktop-main.log"),
         });
       },
-    );
+    });
     setCatalogManager(catalogMgr);
     catalogMgr.start();
+
+    // Install curated skills on first launch (or re-install missing ones on update).
+    // Runs in background — does not block window creation.
+    void catalogMgr.installCuratedSkills().catch((err) => {
+      // Best-effort — curated skills are not critical for app startup.
+      writeDesktopMainLog({
+        source: "skillhub",
+        stream: "stderr",
+        kind: "app",
+        message: `curated skill install failed: ${err instanceof Error ? err.message : String(err)}`,
+        logFilePath: getDesktopLogFilePath("desktop-main.log"),
+      });
+    });
 
     const win = createMainWindow();
 

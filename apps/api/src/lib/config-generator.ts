@@ -715,7 +715,7 @@ export async function generatePoolConfig(
     load: {
       watch: true,
       watchDebounceMs: 250,
-      extraDirs: [`${stateDir}/skills`],
+      extraDirs: [`${stateDir}/bundled-skills`, `${stateDir}/skills`],
     },
   };
 
