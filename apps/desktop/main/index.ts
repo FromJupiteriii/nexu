@@ -35,6 +35,14 @@ import { UpdateManager } from "./updater/update-manager";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Info.plist declares LSUIElement=true so that child processes (spawned with
+// ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
+// BEFORE any blocking initialization (tar extraction, directory creation, etc.)
+// so users see it immediately on first launch.
+app.setName("Nexu Desktop");
+void app.dock?.show();
+
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
@@ -49,14 +57,6 @@ const orchestrator = new RuntimeOrchestrator(
     app.isPackaged,
   ),
 );
-
-app.setName("Nexu Desktop");
-
-// Info.plist declares LSUIElement=true so that child processes (spawned with
-// ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Restore the main
-// process's Dock icon as early as possible — before whenReady / cold-start —
-// so users see it immediately even during first-launch decompression.
-void app.dock?.show();
 
 // Disable Chromium's popup blocker.  window.open() inside webviews can lose
 // "transient user activation" after async work (fetch → response → open),
