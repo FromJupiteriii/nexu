@@ -80,6 +80,7 @@ function SkillCard({
   return (
     <Link
       to={`/workspace/skills/${skill.slug}`}
+      draggable={false}
       className={cn(
         "card flex flex-col p-4",
         isInstalled && !pendingAction ? "" : "",
@@ -505,7 +506,7 @@ export function SkillsPage() {
                 {
                   id: "all" as const,
                   label: t("skills.all"),
-                  count: yourSkillsList.length,
+                  count: installedSkills.length,
                 },
                 {
                   id: "recommended" as const,
