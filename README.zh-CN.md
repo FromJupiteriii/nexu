@@ -9,8 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue" alt="Release" /></a>
+  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/github/v/release/nexu-io/nexu?color=blue" alt="Release" /></a>
   <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
+  <a href="https://github.com/nexu-io/nexu/stargazers"><img src="https://img.shields.io/github/stars/nexu-io/nexu?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
@@ -27,11 +28,13 @@
 
 ---
 
+> 🦞 **最丝滑接入微信 OpenClaw**：扫码即连，开箱即用。
+>
 > 🎉 **内测福利**：内测期间，Claude、GPT、Gemini、Kimi、GLM 等顶级模型 **全部免费、无限量使用**。[立即下载体验 →](https://nexu.io)
 
 ---
 
-## 📋 概述
+## 📋 nexu（奈苏）是什么？
 
 **nexu**（奈苏，next to you）是一个开源桌面客户端，让你的 **OpenClaw 🦞** Agent 直接运行在微信、飞书、Slack、Discord 等 IM 中。
 
@@ -44,9 +47,9 @@
 所有数据保存在本机，隐私安全，完全可控。
 
 <p align="center">
-  <img src="site/media/readme-screenshot.png" width="49%" alt="nexu 截图" />
-  &nbsp;
-  <img src="site/media/readme-wechat-demo.png" width="49%" alt="nexu 微信扫码连接" />
+  <video src="site/media/readme-wechat-demo-zh.mov" width="100%" autoplay loop muted playsinline>
+    您的浏览器不支持视频播放，请 <a href="site/media/readme-wechat-demo-zh.mov">点击下载</a> 观看。
+  </video>
 </p>
 
 ---
@@ -207,6 +210,28 @@ pnpm test
 - 为新功能编写测试
 - 按需更新文档
 - 保持提交原子化且描述清晰
+
+---
+
+## ❓ FAQ
+
+**Q: nexu 免费吗？**
+A: 客户端完全免费且开源（MIT）。内置的顶级模型供你使用，并且可以选择自带 API Key 进行使用。
+
+**Q: 支持哪些操作系统？**
+A: 目前支持 macOS 12+（Apple Silicon）。Windows 和 macOS Intel 版本正在开发中，可邮件 [support@nexu.ai](mailto:support@nexu.ai) 获取进展。
+
+**Q: 支持哪些 IM 平台？**
+A: 内置支持微信、飞书、Slack、Discord，开箱即用。
+
+**Q: 我的数据安全吗？**
+A: 所有数据保存在本机，nexu 不托管你的业务数据。源码开源可审计。
+
+**Q: 可以使用自己的 API Key 吗？**
+A: 可以。填入你的 API Key 即可使用，无需注册账号或登录。
+
+**Q: 微信接入需要什么条件？**
+A: 适配微信 8.0.7 OpenClaw 插件，点击连接、微信扫码即可，无需额外配置。
 
 ---
 
