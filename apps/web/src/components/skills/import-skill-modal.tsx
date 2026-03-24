@@ -83,6 +83,11 @@ export default function ImportSkillModal({
     if (!selectedFile) return;
     try {
       const result = await importMutation.mutateAsync(selectedFile);
+      track("workspace_skill_install", {
+        skill_name: result.slug ?? "unknown_skill",
+        skill_source: "custom",
+        success: true,
+      });
       track("workspace_skill_enable", {
         name: result.slug ?? "unknown_skill",
         skill_source: "custom",
@@ -90,6 +95,11 @@ export default function ImportSkillModal({
       setDone(true);
       autoCloseControllerRef.current.schedule(handleClose, 1200);
     } catch {
+      track("workspace_skill_install", {
+        skill_name: "unknown_skill",
+        skill_source: "custom",
+        success: false,
+      });
       // Error state handled by mutation
     }
   };

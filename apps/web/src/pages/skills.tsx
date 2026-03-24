@@ -24,6 +24,14 @@ type YoursSubTab = "all" | "recommended" | "installed";
 
 const PAGE_SIZE = 50;
 
+function getSkillType(tags: readonly string[]): string | null {
+  const primaryTag = tags[0]?.trim();
+  if (!primaryTag) {
+    return null;
+  }
+  return primaryTag.toLowerCase();
+}
+
 function useDebounce<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
 
@@ -68,11 +76,25 @@ function SkillCard({
 
   async function handleInstall() {
     setPendingAction("install");
+    const skillType = getSkillType(skill.tags);
     try {
       await installMutation.mutateAsync(skill.slug);
+      track("workspace_skill_install", {
+        skill_name: skill.name,
+        skill_type: skillType,
+        skill_source: skillSource,
+        success: true,
+      });
       track("workspace_skill_enable", {
         name: skill.name,
         skill_source: skillSource,
+      });
+    } catch {
+      track("workspace_skill_install", {
+        skill_name: skill.name,
+        skill_type: skillType,
+        skill_source: skillSource,
+        success: false,
       });
     } finally {
       setPendingAction(null);
@@ -82,11 +104,25 @@ function SkillCard({
   async function handleToggle(checked: boolean) {
     if (checked) {
       setPendingAction("install");
+      const skillType = getSkillType(skill.tags);
       try {
         await installMutation.mutateAsync(skill.slug);
+        track("workspace_skill_install", {
+          skill_name: skill.name,
+          skill_type: skillType,
+          skill_source: skillSource,
+          success: true,
+        });
         track("workspace_skill_enable", {
           name: skill.name,
           skill_source: skillSource,
+        });
+      } catch {
+        track("workspace_skill_install", {
+          skill_name: skill.name,
+          skill_type: skillType,
+          skill_source: skillSource,
+          success: false,
         });
       } finally {
         setPendingAction(null);
@@ -95,9 +131,20 @@ function SkillCard({
       setPendingAction("uninstall");
       try {
         await uninstallMutation.mutateAsync(skill.slug);
+        track("workspace_skill_uninstall", {
+          skill_name: skill.name,
+          skill_source: skillSource,
+          success: true,
+        });
         track("workspace_skill_disable", {
           name: skill.name,
           skill_source: skillSource,
+        });
+      } catch {
+        track("workspace_skill_uninstall", {
+          skill_name: skill.name,
+          skill_source: skillSource,
+          success: false,
         });
       } finally {
         setPendingAction(null);
