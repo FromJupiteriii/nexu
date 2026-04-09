@@ -179,6 +179,8 @@ export const cloudCreditBalanceSchema = z
     totalBalance: z.number().int().nonnegative(),
     totalRecharged: z.number().int().nonnegative(),
     totalConsumed: z.number().int().nonnegative(),
+    giftedBalance: z.number().int().nonnegative().optional(),
+    planBalance: z.number().int().nonnegative().optional(),
   })
   .nullable();
 

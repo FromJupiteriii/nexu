@@ -160,12 +160,12 @@ const en = {
   "layout.sidebar.balancePlaceholder": "Balance syncing…",
   "layout.sidebar.rewardsCta": "Open",
   "layout.sidebar.balancePopup.total": "Total credits",
-  "layout.sidebar.balancePopup.recharged": "Plan credits (cumulative)",
+  "layout.sidebar.balancePopup.recharged": "Plan credits",
   "layout.sidebar.balancePopup.rechargedTooltip":
-    "Total credits added from your subscription plan",
-  "layout.sidebar.balancePopup.earned": "Reward credits",
+    "Current credits remaining from your subscription plan.",
+  "layout.sidebar.balancePopup.earned": "Gifted credits",
   "layout.sidebar.balancePopup.earnedTooltip":
-    "Earned from signup rewards, completed tasks, and activities.",
+    "Current credits remaining from signup rewards and reward activities.",
   "layout.sidebar.balancePopup.consumed": "Consumed",
   "layout.sidebar.balancePopup.viewDetail": "View details",
   "layout.mobile.settings": "Settings",

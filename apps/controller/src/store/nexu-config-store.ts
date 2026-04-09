@@ -9,6 +9,7 @@ import type {
   ConnectQqbotInput,
   ConnectSlackInput,
   ConnectWecomInput,
+  CreditRechargeRecord,
   DesktopRewardClaimProof,
   DesktopRewardsStatus,
   ModelProviderConfig,
@@ -40,6 +41,7 @@ import { logger } from "../lib/logger.js";
 import { resolveManagedCloudModel } from "../lib/managed-models.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import {
+  type CloudRewardService,
   type RewardStatusResponse,
   createCloudRewardService,
 } from "../services/cloud-reward-service.js";
@@ -93,6 +95,11 @@ type DesktopRewardClaimResponse = z.infer<
   typeof claimDesktopRewardResponseSchema
 >;
 
+type DesktopBalanceBreakdown = {
+  giftedBalance: number;
+  planBalance: number;
+};
+
 const defaultCloudProfile: CloudProfileEntry = {
   name: "Default",
   cloudUrl: "https://nexu.io",
@@ -102,6 +109,14 @@ const defaultCloudProfile: CloudProfileEntry = {
 const rewardTaskTemplateById = new Map<RewardTaskId, RewardTask>(
   rewardTasks.map((task) => [task.id, task]),
 );
+
+const GIFTED_CREDIT_SOURCES = new Set<CreditRechargeRecord["source"]>([
+  "signup_bonus",
+  "daily_bonus",
+  "github_star",
+  "social_share",
+  "test",
+]);
 
 export type DesktopCloudStateChange = {
   hadCloudInventory: boolean;
@@ -492,6 +507,7 @@ function convertCloudStatusToDesktop(
     activeModelId: string | null;
     activeManagedModel: { provider?: string } | null | undefined;
   },
+  balanceBreakdown?: DesktopBalanceBreakdown,
 ): DesktopRewardsStatus {
   const { cloudConnected, activeModelId, activeManagedModel } = viewer;
   const tasks = cloudStatus.tasks.flatMap((task) => {
@@ -537,8 +553,54 @@ function convertCloudStatusToDesktop(
           totalBalance: cloudStatus.cloudBalance.totalBalance,
           totalRecharged: cloudStatus.cloudBalance.totalRecharged,
           totalConsumed: cloudStatus.cloudBalance.totalConsumed,
+          giftedBalance: balanceBreakdown?.giftedBalance ?? 0,
+          planBalance:
+            balanceBreakdown?.planBalance ??
+            cloudStatus.cloudBalance.totalBalance,
         }
       : null,
+  };
+}
+
+function isActiveCreditGrant(
+  grant: CreditRechargeRecord,
+  nowTimestamp: number,
+): boolean {
+  if (!grant.enabled) {
+    return false;
+  }
+
+  const expiresAtTimestamp = Date.parse(grant.expiresAt);
+  if (!Number.isFinite(expiresAtTimestamp)) {
+    return true;
+  }
+
+  return expiresAtTimestamp > nowTimestamp;
+}
+
+function deriveDesktopBalanceBreakdown(input: {
+  totalBalance: number;
+  grants: CreditRechargeRecord[];
+}): DesktopBalanceBreakdown & { giftedBalanceRaw: number } {
+  const nowTimestamp = Date.now();
+  const giftedBalanceRaw = input.grants.reduce((sum, grant) => {
+    if (!GIFTED_CREDIT_SOURCES.has(grant.source)) {
+      return sum;
+    }
+
+    if (!isActiveCreditGrant(grant, nowTimestamp)) {
+      return sum;
+    }
+
+    return sum + grant.balance;
+  }, 0);
+
+  const giftedBalance = Math.min(giftedBalanceRaw, input.totalBalance);
+
+  return {
+    giftedBalance,
+    planBalance: Math.max(input.totalBalance - giftedBalance, 0),
+    giftedBalanceRaw,
   };
 }
 
@@ -1704,6 +1766,71 @@ export class NexuConfigStore {
     };
   }
 
+  private async resolveDesktopBalanceBreakdown(
+    service: CloudRewardService,
+    cloudStatus: RewardStatusResponse,
+  ): Promise<DesktopBalanceBreakdown | undefined> {
+    if (!cloudStatus.cloudBalance) {
+      return undefined;
+    }
+
+    if (cloudStatus.cloudBalance.totalBalance === 0) {
+      return {
+        giftedBalance: 0,
+        planBalance: 0,
+      };
+    }
+
+    const creditRecordsResult = await service.getCreditRecords();
+    if (!creditRecordsResult.ok) {
+      logger.warn(
+        { reason: creditRecordsResult.reason },
+        "desktop_rewards_credit_records_fallback",
+      );
+      return {
+        giftedBalance: 0,
+        planBalance: cloudStatus.cloudBalance.totalBalance,
+      };
+    }
+
+    const breakdown = deriveDesktopBalanceBreakdown({
+      totalBalance: cloudStatus.cloudBalance.totalBalance,
+      grants: creditRecordsResult.data.grants,
+    });
+
+    if (breakdown.giftedBalanceRaw > cloudStatus.cloudBalance.totalBalance) {
+      logger.warn(
+        {
+          giftedBalanceRaw: breakdown.giftedBalanceRaw,
+          totalBalance: cloudStatus.cloudBalance.totalBalance,
+        },
+        "desktop_rewards_balance_breakdown_clamped",
+      );
+    }
+
+    return {
+      giftedBalance: breakdown.giftedBalance,
+      planBalance: breakdown.planBalance,
+    };
+  }
+
+  private async convertCloudStatusToDesktopStatus(
+    service: CloudRewardService,
+    cloudStatus: RewardStatusResponse,
+    viewer: {
+      cloudConnected: boolean;
+      activeModelId: string | null;
+      activeManagedModel: { provider?: string } | null | undefined;
+    },
+  ): Promise<DesktopRewardsStatus> {
+    const balanceBreakdown = await this.resolveDesktopBalanceBreakdown(
+      service,
+      cloudStatus,
+    );
+
+    return convertCloudStatusToDesktop(cloudStatus, viewer, balanceBreakdown);
+  }
+
   async getDesktopRewardsStatus(): Promise<DesktopRewardsStatus> {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
@@ -1725,7 +1852,7 @@ export class NexuConfigStore {
 
       if (cloudResult.ok) {
         const cloudStatus = cloudResult.data;
-        return convertCloudStatusToDesktop(cloudStatus, {
+        return this.convertCloudStatusToDesktopStatus(service, cloudStatus, {
           cloudConnected: true,
           activeModelId,
           activeManagedModel,
@@ -1817,11 +1944,15 @@ export class NexuConfigStore {
     return {
       ok: claimData.ok,
       alreadyClaimed: claimData.alreadyClaimed,
-      status: convertCloudStatusToDesktop(claimData.status, {
-        cloudConnected: true,
-        activeModelId: activeModelId2,
-        activeManagedModel: activeManagedModel2,
-      }),
+      status: await this.convertCloudStatusToDesktopStatus(
+        service,
+        claimData.status,
+        {
+          cloudConnected: true,
+          activeModelId: activeModelId2,
+          activeManagedModel: activeManagedModel2,
+        },
+      ),
     };
   }
 

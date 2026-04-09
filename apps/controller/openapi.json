@@ -3215,6 +3215,14 @@
                         "totalConsumed": {
                           "type": "integer",
                           "minimum": 0
+                        },
+                        "giftedBalance": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "planBalance": {
+                          "type": "integer",
+                          "minimum": 0
                         }
                       },
                       "default": null,
@@ -3521,6 +3529,14 @@
                             "totalConsumed": {
                               "type": "integer",
                               "minimum": 0
+                            },
+                            "giftedBalance": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "planBalance": {
+                              "type": "integer",
+                              "minimum": 0
                             }
                           },
                           "default": null,
@@ -3751,6 +3767,14 @@
                           "minimum": 0
                         },
                         "totalConsumed": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "giftedBalance": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "planBalance": {
                           "type": "integer",
                           "minimum": 0
                         }

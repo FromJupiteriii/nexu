@@ -1118,6 +1118,8 @@ export type GetApiInternalDesktopRewardsResponses = {
             totalBalance: number;
             totalRecharged: number;
             totalConsumed: number;
+            giftedBalance?: number;
+            planBalance?: number;
         };
         autoFallbackTriggered?: boolean;
     };
@@ -1219,6 +1221,8 @@ export type PostApiInternalDesktopRewardsClaimResponses = {
                 totalBalance: number;
                 totalRecharged: number;
                 totalConsumed: number;
+                giftedBalance?: number;
+                planBalance?: number;
             };
             autoFallbackTriggered?: boolean;
         };
@@ -1281,6 +1285,8 @@ export type PostApiInternalDesktopRewardsSetBalanceResponses = {
             totalBalance: number;
             totalRecharged: number;
             totalConsumed: number;
+            giftedBalance?: number;
+            planBalance?: number;
         };
         autoFallbackTriggered?: boolean;
     };
