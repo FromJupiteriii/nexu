@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> &nbsp;·&nbsp; 简体中文 &nbsp;·&nbsp; <a href="README.ja.md">日本語</a>
+  <a href="README.md">English</a> &nbsp;·&nbsp; 简体中文 &nbsp;·&nbsp; <a href="README.ja.md">日本語</a> &nbsp;·&nbsp; <a href="README.ko.md">한국어</a>
 </p>
 
 ---
