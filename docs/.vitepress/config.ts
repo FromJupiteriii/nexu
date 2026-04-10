@@ -147,6 +147,7 @@ const enSidebar = [
   {
     text: "Help",
     items: [
+      { text: "Windows Installation Guide", link: "/guide/windows-install" },
       { text: "Update Guide", link: "/guide/update" },
       { text: "Troubleshooting", link: "/guide/troubleshooting" },
     ],
@@ -205,6 +206,7 @@ const jaSidebar = [
   {
     text: "ヘルプ",
     items: [
+      { text: "Windows インストールガイド", link: "/ja/guide/windows-install" },
       { text: "アップデートガイド", link: "/ja/guide/update" },
       { text: "トラブルシューティング", link: "/ja/guide/troubleshooting" },
     ],
@@ -264,6 +266,7 @@ const koSidebar = [
   {
     text: "도움말",
     items: [
+      { text: "Windows 설치 가이드", link: "/ko/guide/windows-install" },
       { text: "업데이트 가이드", link: "/ko/guide/update" },
       { text: "문제 해결", link: "/ko/guide/troubleshooting" },
     ],
@@ -322,6 +325,7 @@ const zhSidebar = [
   {
     text: "帮助",
     items: [
+      { text: "Windows 正式版安装指南", link: "/zh/guide/windows-install" },
       { text: "Windows 内测使用指南", link: "/zh/guide/windows-beta" },
       { text: "更新指南", link: "/zh/guide/update" },
       { text: "修复指南", link: "/zh/guide/troubleshooting" },
