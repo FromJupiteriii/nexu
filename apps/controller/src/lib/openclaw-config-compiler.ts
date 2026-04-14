@@ -416,6 +416,13 @@ export function compileOpenClawConfig(
         allowedOrigins: [env.webUrl],
         dangerouslyAllowHostHeaderOriginFallback: true,
       },
+      http: {
+        endpoints: {
+          chatCompletions: {
+            enabled: true,
+          },
+        },
+      },
       tools: {
         allow: ["cron"],
       },
@@ -508,7 +515,8 @@ export function compileOpenClawConfig(
     channels: compileChannelsConfig({
       channels: config.channels,
       secrets: config.secrets,
-      controllerBaseUrl: `http://127.0.0.1:${env.port}`,
+      gatewayBaseUrl: `http://127.0.0.1:${env.openclawGatewayPort}`,
+      gatewayToken: env.openclawGatewayToken,
     }),
     bindings: compileChannelBindings(config.bots, config.channels),
     plugins: compilePlugins(config, env),
