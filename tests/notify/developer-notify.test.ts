@@ -35,7 +35,7 @@ describe("developer-notify", () => {
       prUrl: "https://github.com/nexu-io/nexu/pull/10",
     });
 
-    expect(payload.card.header.title.content).toContain("新增 1 位贡献者");
+    expect(payload.card.header.title.content).toContain("又有新贡献者给 Nexu 提 PR");
     expect(payload.card.body.elements[0]).toMatchObject({
       tag: "markdown",
       content: expect.stringContaining("**Author:** alice"),
@@ -64,10 +64,10 @@ describe("developer-notify", () => {
       payload.card.body.elements[3].columns.map(
         (column) => column.elements[0].text.content,
       ),
-    ).toEqual(["贡献者指南", "立即贡献"]);
+    ).toEqual(["Good First Issue", "贡献者指南", "查看全部 Issue"]);
     expect(payload.card.body.elements[2]).toMatchObject({
       tag: "markdown",
-      content: expect.stringContaining("只需 3 步💥，1️⃣选任务 2️⃣ 认领 3️⃣ 提交"),
+      content: expect.stringContaining("只需 3 步💥：❶ 选任务 ❷ 认领 ❸ 提交 PR"),
     });
   });
 
@@ -76,7 +76,7 @@ describe("developer-notify", () => {
       issueUrl: "https://github.com/nexu-io/nexu/issues/99",
     });
 
-    expect(payload.card.header.title.content).toContain("刚新增 1 条 issue");
+    expect(payload.card.header.title.content).toContain("刚新增 1 条 issue 等你来领取");
     expect(payload.card.body.elements[1]).toMatchObject({ tag: "column_set" });
     expect(
       payload.card.body.elements[1].columns.map(
@@ -88,11 +88,11 @@ describe("developer-notify", () => {
       payload.card.body.elements[3].columns.map(
         (column) => column.elements[0].text.content,
       ),
-    ).toEqual(["领取新手友好 issue", "贡献者指南"]);
+    ).toEqual(["Good First Issue", "贡献者指南", "查看全部 Issue"]);
     expect(payload.card.body.elements[2]).toMatchObject({
       tag: "markdown",
       content: expect.stringContaining(
-        "1️⃣ 最高价值 20 美金的 nexu 使用额度积分奖励",
+        "✅ 最高 2000 积分，可兑换价值 $20 的 nexu 使用额度",
       ),
     });
   });
