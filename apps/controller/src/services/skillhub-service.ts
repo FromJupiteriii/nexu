@@ -1,7 +1,12 @@
 import { existsSync } from "node:fs";
 import type { ControllerEnv } from "../app/env.js";
 import { CatalogManager } from "./skillhub/catalog-manager.js";
-import { copyStaticSkills } from "./skillhub/curated-skills.js";
+import {
+  alignSkillName,
+  copyStaticSkills,
+  replaceLibtvVideoFromBundle,
+  stripRequiresBins,
+} from "./skillhub/curated-skills.js";
 import { InstallQueue } from "./skillhub/install-queue.js";
 import { SkillDb } from "./skillhub/skill-db.js";
 import { SkillDirWatcher } from "./skillhub/skill-dir-watcher.js";
@@ -69,9 +74,13 @@ export class SkillhubService {
     const installQueue = new InstallQueue({
       executor: async (slug) => {
         await catalogManager.executeInstall(slug);
+        alignSkillName(env.openclawSkillsDir, slug);
+        stripRequiresBins(env.openclawSkillsDir, slug);
       },
       onComplete: (slug, source) => {
         skillDb.recordInstall(slug, source);
+      },
+      onIdle: () => {
         options?.onSyncNeeded?.();
       },
       onCancelled: async (slug) => {
@@ -163,6 +172,17 @@ export class SkillhubService {
       if (copied.length > 0) {
         this.db.recordBulkInstall(copied, "managed");
       }
+
+      // Step 1b: Force-refresh libtv-video on every boot so bundled
+      // libtv-video updates (detached background waiter + direct
+      // Feishu delivery) reach existing users on their next app boot.
+      // copyStaticSkills' first-install-only semantics would otherwise
+      // never refresh it. See replaceLibtvVideoFromBundle for rationale.
+      replaceLibtvVideoFromBundle({
+        staticDir: this.env.staticSkillsDir,
+        targetDir: this.env.openclawSkillsDir,
+        skillDb: this.db,
+      });
     }
 
     // Step 2: Enqueue curated skills from ClawHub that aren't on disk yet

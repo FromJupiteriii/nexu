@@ -9,6 +9,7 @@ import type {
   ConnectQqbotInput,
   ConnectSlackInput,
   ConnectWecomInput,
+  CreditRechargeRecord,
   DesktopRewardClaimProof,
   DesktopRewardsStatus,
   ModelProviderConfig,
@@ -37,9 +38,13 @@ import {
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
-import { resolveManagedCloudModel } from "../lib/managed-models.js";
+import {
+  isManagedCloudModelId,
+  resolveManagedCloudModel,
+} from "../lib/managed-models.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import {
+  type CloudRewardService,
   type RewardStatusResponse,
   createCloudRewardService,
 } from "../services/cloud-reward-service.js";
@@ -93,6 +98,11 @@ type DesktopRewardClaimResponse = z.infer<
   typeof claimDesktopRewardResponseSchema
 >;
 
+type DesktopBalanceBreakdown = {
+  giftedBalance: number;
+  planBalance: number;
+};
+
 const defaultCloudProfile: CloudProfileEntry = {
   name: "Default",
   cloudUrl: "https://nexu.io",
@@ -102,6 +112,14 @@ const defaultCloudProfile: CloudProfileEntry = {
 const rewardTaskTemplateById = new Map<RewardTaskId, RewardTask>(
   rewardTasks.map((task) => [task.id, task]),
 );
+
+const GIFTED_CREDIT_SOURCES = new Set<CreditRechargeRecord["source"]>([
+  "signup_bonus",
+  "daily_bonus",
+  "github_star",
+  "social_share",
+  "test",
+]);
 
 export type DesktopCloudStateChange = {
   hadCloudInventory: boolean;
@@ -492,6 +510,7 @@ function convertCloudStatusToDesktop(
     activeModelId: string | null;
     activeManagedModel: { provider?: string } | null | undefined;
   },
+  balanceBreakdown?: DesktopBalanceBreakdown,
 ): DesktopRewardsStatus {
   const { cloudConnected, activeModelId, activeManagedModel } = viewer;
   const tasks = cloudStatus.tasks.flatMap((task) => {
@@ -537,8 +556,54 @@ function convertCloudStatusToDesktop(
           totalBalance: cloudStatus.cloudBalance.totalBalance,
           totalRecharged: cloudStatus.cloudBalance.totalRecharged,
           totalConsumed: cloudStatus.cloudBalance.totalConsumed,
+          giftedBalance: balanceBreakdown?.giftedBalance ?? 0,
+          planBalance:
+            balanceBreakdown?.planBalance ??
+            cloudStatus.cloudBalance.totalBalance,
         }
       : null,
+  };
+}
+
+function isActiveCreditGrant(
+  grant: CreditRechargeRecord,
+  nowTimestamp: number,
+): boolean {
+  if (!grant.enabled) {
+    return false;
+  }
+
+  const expiresAtTimestamp = Date.parse(grant.expiresAt);
+  if (!Number.isFinite(expiresAtTimestamp)) {
+    return true;
+  }
+
+  return expiresAtTimestamp > nowTimestamp;
+}
+
+function deriveDesktopBalanceBreakdown(input: {
+  totalBalance: number;
+  grants: CreditRechargeRecord[];
+}): DesktopBalanceBreakdown & { giftedBalanceRaw: number } {
+  const nowTimestamp = Date.now();
+  const giftedBalanceRaw = input.grants.reduce((sum, grant) => {
+    if (!GIFTED_CREDIT_SOURCES.has(grant.source)) {
+      return sum;
+    }
+
+    if (!isActiveCreditGrant(grant, nowTimestamp)) {
+      return sum;
+    }
+
+    return sum + grant.balance;
+  }, 0);
+
+  const giftedBalance = Math.min(giftedBalanceRaw, input.totalBalance);
+
+  return {
+    giftedBalance,
+    planBalance: Math.max(input.totalBalance - giftedBalance, 0),
+    giftedBalanceRaw,
   };
 }
 
@@ -550,7 +615,7 @@ export class NexuConfigStore {
   /** Callback fired when cloud state changes (connect/disconnect). */
   onCloudStateChanged?: (change: DesktopCloudStateChange) => Promise<void>;
 
-  constructor(env: ControllerEnv) {
+  constructor(private readonly env: ControllerEnv) {
     this.store = new LowDbStore<NexuConfig>(
       env.nexuConfigPath,
       nexuConfigSchema,
@@ -574,7 +639,9 @@ export class NexuConfigStore {
         integrations: [],
         channels: [],
         templates: {},
-        desktop: {},
+        desktop: {
+          analyticsEnabled: true,
+        },
         secrets: {},
       }),
     );
@@ -865,16 +932,41 @@ export class NexuConfigStore {
     if (existing.length > 0) {
       const firstBot = existing[0];
       if (firstBot) {
+        logger.info(
+          {
+            botId: firstBot.id,
+            slug: firstBot.slug,
+            workspacePath: path.join(
+              this.env.openclawStateDir,
+              "agents",
+              firstBot.id,
+            ),
+            existingBotCount: existing.length,
+            resolution: "reused_existing",
+          },
+          "default_bot_resolution",
+        );
         return firstBot;
       }
     }
 
     const config = await this.getConfig();
-    return this.createBot({
+    const bot = await this.createBot({
       name: "nexu Assistant",
       slug: "nexu-assistant",
       modelId: config.runtime.defaultModelId,
     });
+    logger.info(
+      {
+        botId: bot.id,
+        slug: bot.slug,
+        workspacePath: path.join(this.env.openclawStateDir, "agents", bot.id),
+        existingBotCount: existing.length,
+        resolution: "created_implicit_default",
+      },
+      "default_bot_resolution",
+    );
+    return bot;
   }
 
   async createBot(input: {
@@ -901,6 +993,16 @@ export class NexuConfigStore {
       ...config,
       bots: [...config.bots, bot],
     }));
+
+    logger.info(
+      {
+        botId: bot.id,
+        slug: bot.slug,
+        workspacePath: path.join(this.env.openclawStateDir, "agents", bot.id),
+        createdVia: "nexu_config_store.createBot",
+      },
+      "bot_created",
+    );
 
     return bot;
   }
@@ -1704,6 +1806,71 @@ export class NexuConfigStore {
     };
   }
 
+  private async resolveDesktopBalanceBreakdown(
+    service: CloudRewardService,
+    cloudStatus: RewardStatusResponse,
+  ): Promise<DesktopBalanceBreakdown | undefined> {
+    if (!cloudStatus.cloudBalance) {
+      return undefined;
+    }
+
+    if (cloudStatus.cloudBalance.totalBalance === 0) {
+      return {
+        giftedBalance: 0,
+        planBalance: 0,
+      };
+    }
+
+    const creditRecordsResult = await service.getCreditRecords();
+    if (!creditRecordsResult.ok) {
+      logger.warn(
+        { reason: creditRecordsResult.reason },
+        "desktop_rewards_credit_records_fallback",
+      );
+      return {
+        giftedBalance: 0,
+        planBalance: cloudStatus.cloudBalance.totalBalance,
+      };
+    }
+
+    const breakdown = deriveDesktopBalanceBreakdown({
+      totalBalance: cloudStatus.cloudBalance.totalBalance,
+      grants: creditRecordsResult.data.grants,
+    });
+
+    if (breakdown.giftedBalanceRaw > cloudStatus.cloudBalance.totalBalance) {
+      logger.warn(
+        {
+          giftedBalanceRaw: breakdown.giftedBalanceRaw,
+          totalBalance: cloudStatus.cloudBalance.totalBalance,
+        },
+        "desktop_rewards_balance_breakdown_clamped",
+      );
+    }
+
+    return {
+      giftedBalance: breakdown.giftedBalance,
+      planBalance: breakdown.planBalance,
+    };
+  }
+
+  private async convertCloudStatusToDesktopStatus(
+    service: CloudRewardService,
+    cloudStatus: RewardStatusResponse,
+    viewer: {
+      cloudConnected: boolean;
+      activeModelId: string | null;
+      activeManagedModel: { provider?: string } | null | undefined;
+    },
+  ): Promise<DesktopRewardsStatus> {
+    const balanceBreakdown = await this.resolveDesktopBalanceBreakdown(
+      service,
+      cloudStatus,
+    );
+
+    return convertCloudStatusToDesktop(cloudStatus, viewer, balanceBreakdown);
+  }
+
   async getDesktopRewardsStatus(): Promise<DesktopRewardsStatus> {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
@@ -1725,7 +1892,7 @@ export class NexuConfigStore {
 
       if (cloudResult.ok) {
         const cloudStatus = cloudResult.data;
-        return convertCloudStatusToDesktop(cloudStatus, {
+        return this.convertCloudStatusToDesktopStatus(service, cloudStatus, {
           cloudConnected: true,
           activeModelId,
           activeManagedModel,
@@ -1817,11 +1984,15 @@ export class NexuConfigStore {
     return {
       ok: claimData.ok,
       alreadyClaimed: claimData.alreadyClaimed,
-      status: convertCloudStatusToDesktop(claimData.status, {
-        cloudConnected: true,
-        activeModelId: activeModelId2,
-        activeManagedModel: activeManagedModel2,
-      }),
+      status: await this.convertCloudStatusToDesktopStatus(
+        service,
+        claimData.status,
+        {
+          cloudConnected: true,
+          activeModelId: activeModelId2,
+          activeManagedModel: activeManagedModel2,
+        },
+      ),
     };
   }
 
@@ -1872,6 +2043,34 @@ export class NexuConfigStore {
     }));
 
     return locale;
+  }
+
+  async getStoredDesktopAnalyticsEnabled(): Promise<boolean | null> {
+    const config = await this.getConfig();
+    return typeof config.desktop.analyticsEnabled === "boolean"
+      ? config.desktop.analyticsEnabled
+      : null;
+  }
+
+  async getDesktopAnalyticsEnabled(): Promise<boolean> {
+    const storedValue = await this.getStoredDesktopAnalyticsEnabled();
+    if (storedValue !== null) {
+      return storedValue;
+    }
+
+    return this.setDesktopAnalyticsEnabled(true);
+  }
+
+  async setDesktopAnalyticsEnabled(enabled: boolean): Promise<boolean> {
+    await this.store.update((config) => ({
+      ...config,
+      desktop: {
+        ...config.desktop,
+        analyticsEnabled: enabled,
+      },
+    }));
+
+    return enabled;
   }
 
   async refreshDesktopCloudModels() {
@@ -2489,7 +2688,8 @@ export class NexuConfigStore {
   }
 
   async disconnectDesktopCloud() {
-    const previousCloud = readDesktopCloud(await this.getConfig());
+    const previousConfig = await this.getConfig();
+    const previousCloud = readDesktopCloud(previousConfig);
     this.abortDesktopCloudPolling();
 
     await this.setDesktopCloudState({
@@ -2503,6 +2703,41 @@ export class NexuConfigStore {
       apiKey: null,
       models: [],
     });
+    // Strip every managed-cloud (link/*) reference from the persisted config:
+    // the runtime default AND per-bot overrides. Only clearing the global
+    // default leaves bots that were explicitly set to a Link model still
+    // pointing at an unavailable link/* id, which later compiles into the
+    // agent runtime and surfaces as "Unknown model"/"no provider" errors.
+    // BYOK/OAuth selections are untouched so user-configured non-Link bots
+    // keep working.
+    const previousCloudModels = previousCloud.models;
+    const defaultWasManaged = isManagedCloudModelId(
+      previousConfig.runtime.defaultModelId,
+      previousCloudModels,
+    );
+    const botsHaveManaged = previousConfig.bots.some((bot) =>
+      isManagedCloudModelId(bot.modelId, previousCloudModels),
+    );
+    if (defaultWasManaged || botsHaveManaged) {
+      const updatedAt = now();
+      await this.store.update((config) => ({
+        ...config,
+        runtime: {
+          ...config.runtime,
+          defaultModelId: isManagedCloudModelId(
+            config.runtime.defaultModelId,
+            previousCloudModels,
+          )
+            ? ""
+            : config.runtime.defaultModelId,
+        },
+        bots: config.bots.map((bot) =>
+          isManagedCloudModelId(bot.modelId, previousCloudModels)
+            ? { ...bot, modelId: "", updatedAt }
+            : bot,
+        ),
+      }));
+    }
     await this.onCloudStateChanged?.({
       hadCloudInventory: (previousCloud.models?.length ?? 0) > 0,
       hasCloudInventory: false,

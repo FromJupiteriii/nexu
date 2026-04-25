@@ -70,6 +70,15 @@ type SessionsIndexEntry = {
     label?: string;
   };
 };
+type OpenAiUserSessionContext = {
+  channel?: string;
+  accountid?: string;
+  chattype?: string;
+  peerid?: string;
+  conversationid?: string;
+  sendername?: string;
+  groupsubject?: string;
+};
 type ControllerConfigRecord = {
   channels?: Array<{
     id?: string;
@@ -233,14 +242,21 @@ export class SessionsRuntime {
                   qqbotDisplayNames?.groupName ?? hints.groupName,
                   "group",
                 )
-              : hints.groupName;
+              : channelType === "openclaw-weixin"
+                ? undefined
+                : hints.groupName;
           const normalizedSenderName =
             channelType === "qqbot"
               ? normalizeQqbotDisplayName(
                   qqbotDisplayNames?.senderName ?? hints.senderName,
                   "user",
                 )
-              : hints.senderName;
+              : channelType === "openclaw-weixin"
+                ? // WeChat protocol exposes only an opaque @im.wechat id;
+                  // skip the per-sender title and fall through to the
+                  // generic "WeChat ClawBot" fallback below.
+                  undefined
+                : hints.senderName;
           if (this.shouldReplaceInferredTitle(title, sessionKey)) {
             if (normalizedGroupName) {
               title =
@@ -933,7 +949,7 @@ export class SessionsRuntime {
     filePath: string,
     sessionKey: string,
   ): SessionHints {
-    const entry = Object.values(index).find((item) => {
+    const matched = Object.entries(index).find(([, item]) => {
       if (item.sessionId === sessionKey) {
         return true;
       }
@@ -943,18 +959,53 @@ export class SessionsRuntime {
       return false;
     });
 
-    if (!entry) {
+    if (!matched) {
       return {};
     }
 
-    const rawChannel = entry.lastChannel ?? entry.origin?.provider ?? undefined;
-    const channelType = this.normalizeInferredChannelType(rawChannel);
-    const senderName = entry.origin?.label;
+    const [indexKey, entry] = matched;
+    const openAiUserContext = this.parseOpenAiUserSessionContext(indexKey);
+    const rawChannel =
+      openAiUserContext?.channel ??
+      entry.lastChannel ??
+      entry.origin?.provider ??
+      undefined;
+    const normalizedChannel = this.normalizeInferredChannelType(rawChannel);
+    const channelType =
+      normalizedChannel === "dingtalk-connector"
+        ? "dingtalk"
+        : normalizedChannel;
+    const senderName =
+      openAiUserContext?.sendername ?? entry.origin?.label ?? undefined;
+    const groupName = openAiUserContext?.groupsubject ?? undefined;
 
     return {
       senderName,
+      groupName,
       channelType,
     };
+  }
+
+  private parseOpenAiUserSessionContext(
+    indexKey: string,
+  ): OpenAiUserSessionContext | null {
+    const marker = ":openai-user:";
+    const markerIndex = indexKey.indexOf(marker);
+    if (markerIndex === -1) {
+      return null;
+    }
+
+    const rawContext = indexKey.slice(markerIndex + marker.length).trim();
+    if (!rawContext.startsWith("{")) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(rawContext) as OpenAiUserSessionContext;
+      return typeof parsed === "object" && parsed !== null ? parsed : null;
+    } catch {
+      return null;
+    }
   }
 
   private async readSessionMetadata(
@@ -1187,6 +1238,9 @@ export class SessionsRuntime {
     if (normalized === "wechat") {
       return "openclaw-weixin";
     }
+    if (normalized === "dingtalk-connector") {
+      return "dingtalk";
+    }
 
     return normalized || undefined;
   }
@@ -1225,7 +1279,10 @@ export class SessionsRuntime {
     }
 
     return (
-      normalized === sessionKey || UUID_LIKE_TITLE_PATTERN.test(normalized)
+      normalized === sessionKey ||
+      UUID_LIKE_TITLE_PATTERN.test(normalized) ||
+      // Heal sessions whose persisted title is the raw opaque wechat id.
+      normalized.endsWith("@im.wechat")
     );
   }
 

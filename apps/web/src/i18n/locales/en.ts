@@ -160,12 +160,12 @@ const en = {
   "layout.sidebar.balancePlaceholder": "Balance syncing…",
   "layout.sidebar.rewardsCta": "Open",
   "layout.sidebar.balancePopup.total": "Total credits",
-  "layout.sidebar.balancePopup.recharged": "Plan credits (cumulative)",
+  "layout.sidebar.balancePopup.recharged": "Plan credits",
   "layout.sidebar.balancePopup.rechargedTooltip":
-    "Total credits added from your subscription plan",
-  "layout.sidebar.balancePopup.earned": "Reward credits",
+    "Current credits remaining from your subscription plan.",
+  "layout.sidebar.balancePopup.earned": "Gifted credits",
   "layout.sidebar.balancePopup.earnedTooltip":
-    "Earned from signup rewards, completed tasks, and activities.",
+    "Current credits remaining from signup rewards and reward activities.",
   "layout.sidebar.balancePopup.consumed": "Consumed",
   "layout.sidebar.balancePopup.viewDetail": "View details",
   "layout.mobile.settings": "Settings",
@@ -200,6 +200,7 @@ const en = {
   "home.minutesAgo": "Active {{count}} min ago",
   "home.hoursAgo": "Active {{count}} hr ago",
   "home.daysAgo": "Active {{count}} days ago",
+  "home.chat": "Chat",
   "home.feishu": "Feishu",
   "home.channel.feishu": "Feishu / Feishu",
   "home.channel.slack": "Slack",
@@ -441,11 +442,35 @@ const en = {
   "settings.general.fullNameHint":
     "Shown in the workspace sidebar and account surfaces",
   "settings.general.email": "Email",
-  "settings.general.emailHint": "Managed by your current sign-in method",
+  "settings.general.emailHint":
+    "Settings sync is on. Premium models available with your Nexu account.",
+  "settings.general.loggedOut": "Not signed in",
+  "settings.general.loggedOutHint":
+    "Sign in to sync settings and use premium models.",
+  "settings.general.goLogin": "Go to sign in",
+  "settings.general.logoutConfirmTitle": "Log out of your nexu account?",
+  "settings.general.logoutConfirmDescription":
+    "This will disconnect your current nexu account from this desktop workspace.",
   "settings.general.preferences": "Preferences",
   "settings.general.language": "Language",
-  "settings.general.languageHint":
-    "Stored locally for this browser or desktop client",
+  "settings.general.languageHint": "Choose your interface language",
+  "settings.section.desktop": "Application behavior",
+  "settings.section.data": "Data & Privacy",
+  "settings.desktop.launchAtLogin": "Launch at startup",
+  "settings.desktop.launchAtLoginHint":
+    "Automatically open Nexu when your computer starts.",
+  "settings.desktop.showInDock": "Show in Dock",
+  "settings.desktop.showInDockHint":
+    "Show nexu in your Mac Dock for quick access.",
+  "settings.desktop.showInTaskbar": "Show in taskbar",
+  "settings.desktop.showInTaskbarHint":
+    "Show nexu in the taskbar; when off, it stays in the system tray only",
+  "settings.desktop.updateFailed": "Failed to update desktop setting",
+  "settings.data.analytics": "Usage analytics",
+  "settings.data.analyticsHint": "Help improve nexu with anonymous usage data",
+  "settings.data.crashReports": "Crash reports",
+  "settings.data.crashReportsHint":
+    "Send crash reports automatically to help fix bugs",
   "settings.general.saveTitle": "Save changes",
   "settings.general.saveHint": "Profile changes are applied after save",
   "settings.general.save": "Save",
@@ -462,6 +487,28 @@ const en = {
   "settings.general.githubStarredBody":
     "You are helping shape the desktop and workspace experience.",
   "settings.general.githubStarredBadge": "Starred",
+  "settings.section.profile": "Profile",
+  "settings.section.updates": "Updates",
+  "settings.section.about": "About",
+  "settings.updates.version": "Version",
+  "settings.updates.checkNow": "Check now",
+  "settings.updates.checking": "Checking...",
+  "settings.updates.retry": "Check again",
+  "settings.updates.idleHint":
+    "Check for updates and install the latest desktop build.",
+  "settings.updates.checkingHint": "Looking for a newer version...",
+  "settings.updates.downloading": "Downloading {{percent}}%",
+  "settings.updates.downloadingHint": "Downloading update: {{percent}}%",
+  "settings.updates.error": "Unable to check for updates right now.",
+  "settings.updates.versionUnknown": "Current version is unavailable.",
+  "settings.about.docs": "Documentation",
+  "settings.about.github": "GitHub Repository",
+  "settings.about.changelog": "Changelog",
+  "settings.about.feedback": "Send feedback",
+  "settings.providers.botModelTitle": "nexu Bot model",
+  "settings.providers.botModelDesc":
+    "Pick the default model used by your desktop workspace.",
+  "settings.providers.workspace": "Workspace",
   "models.loading": "Loading models...",
   "models.retry": "Retry",
   "models.loadFailed": "Failed to load models",
@@ -538,6 +585,9 @@ const en = {
     "Sign in with your nexu account to access unlimited premium models like Claude Opus 4.6, GPT-5.4, and more — no API key needed.",
   "models.managed.waitingLogin": "Waiting for browser login...",
   "models.managed.loginButton": "Sign in to nexu",
+  "models.managed.logoutConfirmTitle": "Log out of nexu Official?",
+  "models.managed.logoutConfirmDescription":
+    "This will disconnect nexu Official from your current nexu account on this device.",
   "models.managed.availableModels": "Available models",
   "models.managed.refreshSucceeded": "Models refreshed",
   "models.managed.refreshFailed": "Could not refresh models",
@@ -645,6 +695,13 @@ const en = {
   "channels.openTelegramDesc":
     "Open your bot profile, start a direct chat, or add it to a group. Group replies work when the bot is mentioned.",
   "channels.openTelegramBot": "Open Bot",
+  "channels.open": "Open",
+  "channels.openInDiscord": "Open in Discord",
+  "channels.openInWhatsApp": "Open in WhatsApp",
+  "channels.openInDingTalk": "Open in DingTalk",
+  "channels.openInWeCom": "Open in WeCom",
+  "channels.openInQQ": "Open in QQ",
+  "channels.openInWeChat": "Open in WeChat",
   "channels.webhookUrl": "Webhook URL",
   "channels.credentials": "Credentials",
   "channels.accountId": "Account ID",
@@ -704,6 +761,23 @@ const en = {
   "skills.installQueued": "Skill queued for installation",
   "skills.skillNotFound":
     '"{{slug}}" is not available on ClawHub. It may have been removed or renamed.',
+  "skills.skillNotAvailable":
+    "This skill is not available on ClawHub. It may have been removed or renamed.",
+  "skills.installRateLimited":
+    "ClawHub is rate-limiting requests. Please wait a moment and retry.",
+  "skills.installFailedGeneric":
+    "Installation failed. Please retry in a moment.",
+  "skills.retryInstall": "Retry",
+  "skills.cancelInstall": "Cancel",
+  "skills.cancelling": "Cancelling…",
+  "skills.cancelFailed": "Failed to cancel: {{error}}",
+  "skills.installNpmMissing":
+    "npm is required to install this skill. Please install Node.js from https://nodejs.org/ and restart Nexu.",
+  "skills.installDepsFailed":
+    'Failed to install dependencies for "{{slug}}". Check the controller logs for details.',
+  "skills.installFailed": 'Failed to install "{{slug}}": {{error}}',
+  "skills.installRequestFailed": "Could not start the install: {{error}}",
+  "skills.uninstallRequestFailed": "Could not uninstall the skill: {{error}}",
   "skills.import": "Import",
   "skills.importSkill": "Import Skill",
   "skills.importSkillDesc":
@@ -819,6 +893,7 @@ const en = {
   "sessions.chat.replyLabel": "Reply",
   "sessions.chat.toolActivity": "Tool",
   "sessions.chat.toolCompleted": "Completed",
+  "sessions.openFolder": "Open Folder",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "Integrations",
@@ -1014,6 +1089,22 @@ const en = {
 
   // ── WhatsApp Setup ──
   "whatsappSetup.title": "Connect WhatsApp",
+  "whatsappSetup.personalTitle": "Connect Personal WhatsApp",
+  "whatsappSetup.desc":
+    "Scan once with your phone to link WhatsApp Web. Direct messages stay open, and group replies are enabled by default when the account is mentioned.",
+  "whatsappSetup.qrAlt": "WhatsApp QR code",
+  "whatsappSetup.waitingForScan": "Waiting for WhatsApp scan",
+  "whatsappSetup.scanHint":
+    "Open WhatsApp on your phone, then go to Linked Devices and scan this QR code.",
+  "whatsappSetup.preparingQr": "Preparing WhatsApp QR code",
+  "whatsappSetup.finishingConnection": "Finishing WhatsApp connection",
+  "whatsappSetup.retry": "Retry",
+  "whatsappSetup.scanQr": "Scan WhatsApp QR",
+  "whatsappSetup.connectSuccess": "WhatsApp connected",
+  "whatsappSetup.connectFailed": "WhatsApp connect failed",
+  "whatsappSetup.startFailed": "Failed to start WhatsApp login",
+  "whatsappSetup.loadQrFailed": "Failed to load WhatsApp QR code",
+  "whatsappSetup.waitFailed": "WhatsApp login timed out",
 
   // ── QQ Setup ──
   "qqbotSetup.title": "Connect QQ",

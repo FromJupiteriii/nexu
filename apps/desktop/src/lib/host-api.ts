@@ -1,6 +1,7 @@
 import type {
   AppInfo,
   DesktopRuntimeConfig,
+  DesktopUpdateCapability,
   DiagnosticsExportResult,
   DiagnosticsInfo,
   HostDesktopCommand,
@@ -37,6 +38,19 @@ export async function exportDiagnostics(
 
 export function reportStartupProbe(payload: StartupProbePayload): void {
   getHostBridge().reportStartupProbe(payload);
+}
+
+export function reportDesktopDevPageError(input: {
+  level: "error";
+  message: string;
+  url: string | null;
+  sourceId: string | null;
+  line: number | null;
+}): void {
+  getHostBridge().reportRendererDiagnosticsLog({
+    source: "page-error",
+    ...input,
+  });
 }
 
 export async function triggerMainProcessCrash(): Promise<void> {
@@ -182,6 +196,10 @@ export function onRuntimeEvent(
 export async function checkForUpdate(): Promise<boolean> {
   const result = await getHostBridge().invoke("update:check", undefined);
   return result.updateAvailable;
+}
+
+export async function getUpdateCapability(): Promise<DesktopUpdateCapability> {
+  return getHostBridge().invoke("update:get-capability", undefined);
 }
 
 export async function downloadUpdate(): Promise<boolean> {

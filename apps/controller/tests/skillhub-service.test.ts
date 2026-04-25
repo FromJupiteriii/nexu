@@ -131,6 +131,11 @@ const mocks = vi.hoisted(() => {
     skipped: [] as string[],
   }));
 
+  const mockReplaceLibtvVideoFromBundle = vi.fn(() => ({
+    installed: false as boolean,
+    reason: "bundle-missing" as "bundle-missing" | "fresh-install" | "replaced",
+  }));
+
   return {
     mockSkillDbCreate,
     catalogManagerInstances,
@@ -140,6 +145,7 @@ const mocks = vi.hoisted(() => {
     dirWatcherInstances,
     MockSkillDirWatcher,
     mockCopyStaticSkills,
+    mockReplaceLibtvVideoFromBundle,
   };
 });
 
@@ -163,6 +169,7 @@ vi.mock("../src/services/skillhub/skill-dir-watcher.js", () => ({
 
 vi.mock("../src/services/skillhub/curated-skills.js", () => ({
   copyStaticSkills: mocks.mockCopyStaticSkills,
+  replaceLibtvVideoFromBundle: mocks.mockReplaceLibtvVideoFromBundle,
 }));
 
 import { SkillhubService } from "../src/services/skillhub-service.js";
@@ -510,7 +517,7 @@ describe("SkillhubService", () => {
   });
 
   describe("onSyncNeeded callback", () => {
-    it("calls onSyncNeeded after install completes", async () => {
+    it("calls onSyncNeeded via onIdle (not per-install onComplete)", async () => {
       const env = createEnv(rootDir);
       const db = createMockSkillDb();
       mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
@@ -519,14 +526,19 @@ describe("SkillhubService", () => {
       await SkillhubService.create(env, { onSyncNeeded });
 
       const queue = mocks.installQueueInstances[0];
+
+      // onComplete only records in DB, does NOT call onSyncNeeded
       const onComplete = queue.opts.onComplete as (
         slug: string,
         source: string,
       ) => void;
-
       onComplete("alpha", "managed");
-
       expect(db.recordInstall).toHaveBeenCalledWith("alpha", "managed");
+      expect(onSyncNeeded).not.toHaveBeenCalled();
+
+      // onIdle fires onSyncNeeded (when queue drains)
+      const onIdle = queue.opts.onIdle as () => void;
+      onIdle();
       expect(onSyncNeeded).toHaveBeenCalledTimes(1);
     });
 

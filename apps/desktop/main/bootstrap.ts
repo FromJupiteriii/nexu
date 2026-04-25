@@ -1,8 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { app } from "electron";
 import { getDesktopNexuHomeDir } from "../shared/desktop-paths";
 import { resolveRuntimePlatform } from "./platforms/platform-resolver";
+import { resolveNonWindowsPackagedUserDataPath } from "./platforms/shared/packaged-user-data-path";
+import { resolveWindowsPackagedUserDataPath } from "./platforms/windows/user-data-path";
 import {
   getLegacyPackagedNexuHomeDir,
   migrateNexuHomeFromUserData,
@@ -117,34 +120,21 @@ function configurePackagedPaths(): void {
 
   const appDataPath = app.getPath("appData");
   const overrideUserDataPath = process.env.NEXU_DESKTOP_USER_DATA_ROOT;
-  const defaultUserDataPath = app.getPath("userData");
+  const registryUserDataPath =
+    process.platform === "win32" ? readWindowsRegistryUserDataRoot() : null;
   const runtimePlatform = resolveRuntimePlatform();
-  const legacyWindowsUserDataPath = join(appDataPath, "@nexu", "desktop");
-  const standardWindowsUserDataPath = join(appDataPath, "nexu-desktop");
-  const userDataPath = overrideUserDataPath
-    ? resolve(overrideUserDataPath)
-    : runtimePlatform === "win"
-      ? standardWindowsUserDataPath
-      : join(appDataPath, "@nexu", "desktop");
-  let effectiveUserDataPath = userDataPath;
-
-  if (
-    runtimePlatform === "win" &&
-    !overrideUserDataPath &&
-    userDataPath !== legacyWindowsUserDataPath &&
-    !existsSync(userDataPath) &&
-    existsSync(legacyWindowsUserDataPath)
-  ) {
-    try {
-      renameSync(legacyWindowsUserDataPath, userDataPath);
-    } catch (error) {
-      effectiveUserDataPath = legacyWindowsUserDataPath;
-      safeWrite(
-        process.stdout,
-        `[desktop:paths] legacy userData migration failed; reusing legacy path error=${error instanceof Error ? error.message : String(error)} from=${legacyWindowsUserDataPath} to=${userDataPath}\n`,
-      );
-    }
-  }
+  const packagedUserDataPath =
+    runtimePlatform === "win"
+      ? resolveWindowsPackagedUserDataPath({
+          appDataPath,
+          overrideUserDataPath,
+          registryUserDataPath,
+        })
+      : resolveNonWindowsPackagedUserDataPath({
+          appDataPath,
+          overrideUserDataPath,
+        });
+  const effectiveUserDataPath = packagedUserDataPath.resolvedUserDataPath;
 
   const sessionDataPath = join(effectiveUserDataPath, "session");
   const logsPath = join(effectiveUserDataPath, "logs");
@@ -179,8 +169,33 @@ function configurePackagedPaths(): void {
 
   safeWrite(
     process.stdout,
-    `[desktop:paths] appData=${appDataPath} defaultUserData=${defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} userData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`,
+    runtimePlatform === "win"
+      ? `[desktop:paths:win] appData=${appDataPath} defaultUserData=${packagedUserDataPath.defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} registryUserData=${registryUserDataPath ?? "<unset>"} resolvedUserData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`
+      : `[desktop:paths] appData=${appDataPath} defaultUserData=${packagedUserDataPath.defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} registryUserData=${registryUserDataPath ?? "<unset>"} userData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`,
   );
+}
+
+function readWindowsRegistryUserDataRoot(): string | null {
+  try {
+    const output = execFileSync(
+      "reg.exe",
+      ["query", "HKCU\\Software\\Nexu\\Desktop", "/v", "UserDataRoot"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true,
+      },
+    );
+
+    for (const line of output.split(/\r?\n/u)) {
+      const match = line.match(/^\s*UserDataRoot\s+REG_\w+\s+(.+)$/u);
+      if (match?.[1]) {
+        return match[1].trim();
+      }
+    }
+  } catch {}
+
+  return null;
 }
 
 loadDesktopDevEnv();

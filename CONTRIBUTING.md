@@ -4,6 +4,8 @@ This file is the **canonical English** contributing guide. The docs site embeds 
 
 Thank you for helping improve nexu. The sections below cover **code**, **documentation**, and **how we review changes**.
 
+If you want a lower-friction entry point, we are actively looking for **Good First Issue** contributors. Start with the [good-first-issue label](https://github.com/nexu-io/nexu/labels/good-first-issue) or the [Chinese first-PR guide](https://docs.nexu.io/zh/guide/first-pr).
+
 ## Community standards
 
 - **Code of conduct:** follow [`CODE_OF_CONDUCT.md`](https://github.com/nexu-io/nexu/blob/main/CODE_OF_CONDUCT.md) in all Issues, Discussions, and PRs.
@@ -29,7 +31,7 @@ Thank you for helping improve nexu. The sections below cover **code**, **documen
 - **Git**
 - **Node.js** 24+ (LTS recommended; enforced via `package.json` `engines`)
 - **pnpm** 10.26+ (repo pins `pnpm@10.26.0` via `packageManager`)
-- **npm** 11+ (required for `openclaw-runtime` maintenance flows)
+- **npm** 11+ (required for repo-local OpenClaw runtime maintenance flows)
 
 ### Clone and install
 
@@ -52,7 +54,7 @@ nexu/
 │   ├── desktop/          # Electron desktop shell
 │   └── controller/       # Hono backend + OpenClaw orchestration
 ├── packages/shared/      # Shared Zod schemas
-├── openclaw-runtime/     # Repo-local packaged OpenClaw runtime
+├── packages/slimclaw/    # Repo-local OpenClaw runtime contract + prepared runtime ownership
 ├── scripts/              # Dev/CI scripts (launchd, probes, e2e)
 ├── tests/                # Vitest test suites
 ├── docs/                 # VitePress documentation site

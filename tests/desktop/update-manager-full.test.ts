@@ -121,6 +121,7 @@ async function createManager(
   const mgr = new UpdateManager(win as never, orchestrator as never, {
     channel: "stable",
     feedUrl: null,
+    platform: "darwin",
     ...options,
   });
   return { mgr, win, orchestrator };
@@ -168,6 +169,67 @@ describe("bindEvents", () => {
       expect.objectContaining({
         message: expect.stringContaining("update feed configured"),
       }),
+    );
+  });
+
+  it("auto-download: user-initiated checks surface available state", async () => {
+    let resolveCheck!: (value: unknown) => void;
+    mockAutoUpdater.checkForUpdates.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCheck = resolve;
+      }),
+    );
+
+    const { mgr, win } = await createManager(undefined, { autoDownload: true });
+    const handlers = extractHandlers();
+
+    const checkPromise = mgr.checkNow({ userInitiated: true });
+    handlers["update-available"]({
+      version: "1.0.0",
+      releaseDate: "2026-03-20",
+      releaseNotes: "Bug fixes",
+    });
+    resolveCheck({
+      updateInfo: { version: "1.0.0", releaseDate: "2026-03-20" },
+    });
+
+    await checkPromise;
+
+    expect(win.webContents.send).toHaveBeenCalledWith(
+      "update:available",
+      expect.objectContaining({
+        version: "1.0.0",
+        diagnostic: expect.objectContaining({ remoteVersion: "1.0.0" }),
+      }),
+    );
+  });
+
+  it("auto-download: background checks stay silent", async () => {
+    let resolveCheck!: (value: unknown) => void;
+    mockAutoUpdater.checkForUpdates.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCheck = resolve;
+      }),
+    );
+
+    const { mgr, win } = await createManager(undefined, { autoDownload: true });
+    const handlers = extractHandlers();
+
+    const checkPromise = mgr.checkNow();
+    handlers["update-available"]({
+      version: "1.0.0",
+      releaseDate: "2026-03-20",
+      releaseNotes: "Bug fixes",
+    });
+    resolveCheck({
+      updateInfo: { version: "1.0.0", releaseDate: "2026-03-20" },
+    });
+
+    await checkPromise;
+
+    expect(win.webContents.send).not.toHaveBeenCalledWith(
+      "update:available",
+      expect.anything(),
     );
   });
 
@@ -583,6 +645,33 @@ describe("downloadUpdate", () => {
     expect(mockAutoUpdater.downloadUpdate).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ ok: true });
   });
+
+  it("surfaces cached progress immediately when switching from background to foreground", async () => {
+    mockAutoUpdater.downloadUpdate.mockResolvedValue(undefined);
+
+    const { mgr, win } = await createManager(undefined, { autoDownload: true });
+    const handlers = extractHandlers();
+
+    handlers["update-available"]({
+      version: "0.3.0",
+      releaseDate: "2026-04-10T00:00:00Z",
+    });
+    handlers["download-progress"]({
+      percent: 61,
+      bytesPerSecond: 1024,
+      transferred: 610,
+      total: 1000,
+    });
+
+    await mgr.downloadUpdate();
+
+    expect(win.webContents.send).toHaveBeenCalledWith("update:progress", {
+      percent: 61,
+      bytesPerSecond: 1024,
+      transferred: 610,
+      total: 1000,
+    });
+  });
 });
 
 // ===========================================================================
@@ -908,6 +997,20 @@ describe("constructor", () => {
       provider: "generic",
       url: expect.stringContaining("desktop-releases.nexu.io/stable/"),
     });
+  });
+
+  it("exposes a non-in-app capability on Windows without binding autoUpdater", async () => {
+    const { mgr } = await createManager(undefined, { platform: "win32" });
+
+    expect(mgr.getCapability()).toEqual({
+      platform: "win32",
+      check: true,
+      downloadMode: "in-app",
+      applyMode: "external-installer",
+      applyLabel: "Install",
+      notes: null,
+    });
+    expect(mockAutoUpdater.on).not.toHaveBeenCalled();
   });
 });
 

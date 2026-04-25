@@ -9,6 +9,7 @@ import type {
   WhatsappAccountConfig,
 } from "@nexu/shared";
 import type { BotResponse, ChannelResponse } from "@nexu/shared";
+import { logger } from "./logger.js";
 
 /** Prefix for all internal placeholder account IDs that must never be persisted to runtime state. */
 export const NEXU_INTERNAL_ACCOUNT_PREFIX = "__nexu_internal_";
@@ -88,7 +89,8 @@ export function compileChannelBindings(
 export function compileChannelsConfig(params: {
   channels: ChannelResponse[];
   secrets: Record<string, string>;
-  controllerBaseUrl: string;
+  gatewayBaseUrl: string;
+  gatewayToken?: string;
 }): OpenClawConfig["channels"] {
   const slackAccounts: Record<string, SlackAccountConfig> = {};
   const discordAccounts: Record<string, DiscordAccountConfig> = {};
@@ -105,8 +107,16 @@ export function compileChannelsConfig(params: {
   const useSlackSocketMode =
     typeof socketAppToken === "string" && socketAppToken.length > 0;
 
+  const skippedChannels: Array<{ id: string; type: string; reason: string }> =
+    [];
+
   for (const channel of params.channels) {
     if (channel.status !== "connected" && channel.channelType !== "feishu") {
+      skippedChannels.push({
+        id: channel.id,
+        type: channel.channelType,
+        reason: `status=${channel.status}`,
+      });
       continue;
     }
 
@@ -171,8 +181,8 @@ export function compileChannelsConfig(params: {
         enabled: true,
         clientId: secret("clientId") || channel.appId || "",
         clientSecret: secret("clientSecret"),
-        enableMediaUpload: false,
-        gatewayBaseUrl: params.controllerBaseUrl,
+        gatewayBaseUrl: params.gatewayBaseUrl,
+        ...(params.gatewayToken ? { gatewayToken: params.gatewayToken } : {}),
         dmPolicy: "open",
         allowFrom: ["*"],
         groupPolicy: "open",
@@ -253,6 +263,32 @@ export function compileChannelsConfig(params: {
     // gateway restart (~20-45s → ~500ms).
     wechatAccounts[INTERNAL_WECHAT_PREWARM_ACCOUNT_ID] = { enabled: false };
   }
+
+  const compiled: Record<string, number> = {};
+  if (Object.keys(slackAccounts).length > 0)
+    compiled.slack = Object.keys(slackAccounts).length;
+  if (Object.keys(discordAccounts).length > 0)
+    compiled.discord = Object.keys(discordAccounts).length;
+  if (Object.keys(telegramAccounts).length > 0)
+    compiled.telegram = Object.keys(telegramAccounts).length;
+  if (Object.keys(feishuAccounts).length > 0)
+    compiled.feishu = Object.keys(feishuAccounts).length;
+  if (Object.keys(whatsappAccounts).length > 0)
+    compiled.whatsapp = Object.keys(whatsappAccounts).length;
+  if (Object.keys(wechatAccounts).length > 0)
+    compiled.wechat = Object.keys(wechatAccounts).length;
+  if (dingtalkChannel) compiled.dingtalk = 1;
+  if (wecomChannel) compiled.wecom = 1;
+  if (qqbotChannel) compiled.qqbot = 1;
+
+  logger.info(
+    {
+      inputCount: params.channels.length,
+      compiled,
+      skipped: skippedChannels.length > 0 ? skippedChannels : undefined,
+    },
+    "compile_channels_summary",
+  );
 
   return {
     ...(Object.keys(slackAccounts).length > 0
